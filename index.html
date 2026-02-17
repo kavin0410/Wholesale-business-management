@@ -1,484 +1,724 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wholesale Business Management System</title>
-  <meta name="description" content="A modern wholesale business management system for managing products, suppliers, customers, orders and payments." />
+  <title>SupplyNest — Wholesale Business Management</title>
+  <meta name="description"
+    content="SupplyNest — A modern wholesale business management system for managing products, suppliers, customers, orders and payments." />
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
+
 <body>
 
-<!-- ======== Mobile Toggle ======== -->
-<button class="mobile-toggle" id="mobileToggle" aria-label="Toggle sidebar">☰</button>
-<div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <!-- ======== LOGIN PAGE ======== -->
+  <div class="login-page" id="loginPage">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="brand-icon-lg">SN</div>
+        <h1>SupplyNest<span>Wholesale Business Management</span></h1>
+      </div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginUsername">Username</label>
+          <input type="text" id="loginUsername" placeholder="Enter username" required />
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="Enter password" required />
+        </div>
 
-<!-- ======== Sidebar ======== -->
-<aside class="sidebar" id="sidebar">
-  <div class="sidebar-brand">
-    <div class="brand-icon">W</div>
-    <h2>WholeSale<span>Business Manager</span></h2>
+        <button type="submit" class="btn btn-primary"
+          style="width:100%;justify-content:center;padding:14px;font-size:16px;">🔐 Sign In</button>
+        <div class="login-hint">
+          <p>Admin: <strong>admin / admin123</strong></p>
+          <p>Staff: <strong>staff / staff123</strong></p>
+        </div>
+      </form>
+    </div>
   </div>
-  <ul class="sidebar-nav">
-    <li>
-      <a href="#" class="nav-link active" data-page="dashboard">
-        <span class="nav-icon">📊</span> Dashboard
-      </a>
-    </li>
-    <li>
-      <a href="#" class="nav-link" data-page="products">
-        <span class="nav-icon">📦</span> Products
-      </a>
-    </li>
-    <li>
-      <a href="#" class="nav-link" data-page="suppliers">
-        <span class="nav-icon">🏭</span> Suppliers
-      </a>
-    </li>
-    <li>
-      <a href="#" class="nav-link" data-page="customers">
-        <span class="nav-icon">👥</span> Customers
-      </a>
-    </li>
-    <li>
-      <a href="#" class="nav-link" data-page="orders">
-        <span class="nav-icon">🛒</span> Orders
-      </a>
-    </li>
-    <li>
-      <a href="#" class="nav-link" data-page="payments">
-        <span class="nav-icon">💳</span> Payments
-      </a>
-    </li>
-  </ul>
-</aside>
 
-<!-- ======== Main Content ======== -->
-<main class="main" id="mainContent">
+  <!-- ======== Mobile Toggle ======== -->
+  <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle sidebar">☰</button>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-  <!-- ===== DASHBOARD ===== -->
-  <section class="page-section active" id="page-dashboard">
-    <div class="page-header">
-      <h1>Dashboard</h1>
-      <p>Overview of your wholesale business at a glance</p>
+  <!-- ======== Sidebar ======== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">SN</div>
+      <h2>SupplyNest<span>Wholesale Business Management</span></h2>
     </div>
+    <ul class="sidebar-nav" id="sidebarNav">
+      <li>
+        <a href="#" class="nav-link active" data-page="dashboard">
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-page="products">
+          <span class="nav-icon">📦</span> Products
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-page="suppliers">
+          <span class="nav-icon">🏭</span> Suppliers
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-page="customers">
+          <span class="nav-icon">👥</span> Customers
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-page="orders">
+          <span class="nav-icon">🛒</span> Orders
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-page="payments">
+          <span class="nav-icon">💳</span> Payments
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-page="analytics">
+          <span class="nav-icon">📈</span> Analytics
+        </a>
+      </li>
+      <li>
+        <a href="#" class="nav-link" data-page="settings">
+          <span class="nav-icon">⚙️</span> Settings
+        </a>
+      </li>
+    </ul>
+    <div class="sidebar-footer">
+      <button class="btn btn-danger btn-sm" id="logoutBtn" style="width:100%;justify-content:center;">🚪 Logout</button>
+    </div>
+  </aside>
 
-    <!-- Stat Cards -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon blue">📦</div>
-        <div class="stat-info">
-          <h3 id="totalProducts">0</h3>
-          <p>Total Products</p>
-        </div>
+  <!-- ======== Top Bar ======== -->
+  <div class="top-bar" id="topBar">
+    <div class="top-bar-left">
+      <span class="user-role-badge" id="userRoleBadge">Admin</span>
+      <span class="user-greeting" id="userGreeting">Welcome back</span>
+    </div>
+    <div class="top-bar-right">
+      <!-- Multi-Currency Selector -->
+      <div class="currency-selector">
+        <select id="currencySelect">
+          <option value="INR" data-symbol="₹">🇮🇳 INR (₹)</option>
+          <option value="USD" data-symbol="$">🇺🇸 USD ($)</option>
+          <option value="EUR" data-symbol="€">🇪🇺 EUR (€)</option>
+        </select>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon green">👥</div>
-        <div class="stat-info">
-          <h3 id="totalCustomers">0</h3>
-          <p>Total Customers</p>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon orange">🛒</div>
-        <div class="stat-info">
-          <h3 id="totalOrders">0</h3>
-          <p>Total Orders</p>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon purple">💰</div>
-        <div class="stat-info">
-          <h3 id="totalSales">₹0</h3>
-          <p>Total Sales</p>
+      <!-- Notification Bell -->
+      <div class="notification-bell" id="notificationBell">
+        <span class="bell-icon">🔔</span>
+        <span class="notification-count" id="notificationCount">0</span>
+        <div class="notification-dropdown" id="notificationDropdown">
+          <div class="notification-header">
+            <h4>Notifications</h4>
+            <button class="btn-link" id="clearNotifications">Clear all</button>
+          </div>
+          <ul class="notification-list" id="notificationList">
+            <li class="empty-notif">No new notifications</li>
+          </ul>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Quick Info -->
-    <div class="quick-info-grid">
+  <!-- ======== Main Content ======== -->
+  <main class="main" id="mainContent">
+
+    <!-- ===== DASHBOARD ===== -->
+    <section class="page-section active" id="page-dashboard">
+      <div class="page-header">
+        <h1>Dashboard</h1>
+        <p>Overview of your wholesale business at a glance</p>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon blue">📦</div>
+          <div class="stat-info">
+            <h3 id="totalProducts">0</h3>
+            <p>Total Products</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">👥</div>
+          <div class="stat-info">
+            <h3 id="totalCustomers">0</h3>
+            <p>Total Customers</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange">🛒</div>
+          <div class="stat-info">
+            <h3 id="totalOrders">0</h3>
+            <p>Total Orders</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon purple">💰</div>
+          <div class="stat-info">
+            <h3 id="totalSales">₹0</h3>
+            <p>Total Sales</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon teal">📊</div>
+          <div class="stat-info">
+            <h3 id="totalProfit">₹0</h3>
+            <p>Total Profit</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profit Summary -->
+      <div class="card" id="profitSummaryCard">
+        <div class="card-title"><span class="icon">💹</span> Profit Summary</div>
+        <div class="profit-summary-grid">
+          <div class="profit-metric">
+            <h4>Total Revenue</h4>
+            <div class="profit-value" id="profitRevenue">₹0</div>
+          </div>
+          <div class="profit-metric">
+            <h4>Total Cost</h4>
+            <div class="profit-value text-warning" id="profitCost">₹0</div>
+          </div>
+          <div class="profit-metric">
+            <h4>Net Profit</h4>
+            <div class="profit-value text-success" id="profitNet">₹0</div>
+          </div>
+          <div class="profit-metric">
+            <h4>Profit Margin</h4>
+            <div class="profit-value text-info" id="profitMargin">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Info -->
+      <div class="quick-info-grid">
+        <div class="card">
+          <div class="card-title"><span class="icon">🕐</span> Recent Orders</div>
+          <ul class="recent-list" id="recentOrdersList">
+            <li class="empty-state">
+              <div class="empty-icon">📋</div>
+              <p>No orders yet. Create your first order!</p>
+            </li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon">⭐</span> Low Stock Alerts</div>
+          <ul class="recent-list" id="lowStockList">
+            <li class="empty-state">
+              <div class="empty-icon">✅</div>
+              <p>All products are well stocked.</p>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Smart Suggestions -->
+      <div class="card" id="smartSuggestionsCard">
+        <div class="card-title"><span class="icon">🧠</span> Smart Suggestions</div>
+        <div class="suggestions-grid">
+          <div class="suggestion-box">
+            <h4>🔥 Frequently Ordered</h4>
+            <ul id="freqOrderedList">
+              <li class="muted">No data yet</li>
+            </ul>
+          </div>
+          <div class="suggestion-box">
+            <h4>🛍️ Customers Also Buy</h4>
+            <ul id="alsoByList">
+              <li class="muted">No data yet</li>
+            </ul>
+          </div>
+          <div class="suggestion-box">
+            <h4>📦 Restock Recommendations</h4>
+            <ul id="restockList">
+              <li class="muted">No data yet</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PRODUCTS ===== -->
+    <section class="page-section" id="page-products">
+      <div class="page-header">
+        <h1>Products</h1>
+        <p>Manage your product inventory</p>
+      </div>
+
+      <!-- Add / Edit Product Form -->
       <div class="card">
-        <div class="card-title"><span class="icon">🕐</span> Recent Orders</div>
-        <ul class="recent-list" id="recentOrdersList">
-          <li class="empty-state">
-            <div class="empty-icon">📋</div>
-            <p>No orders yet. Create your first order!</p>
-          </li>
-        </ul>
+        <div class="card-title"><span class="icon">➕</span> <span id="productFormTitle">Add New Product</span></div>
+        <form id="productForm">
+          <input type="hidden" id="productEditId" value="" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="productName">Product Name</label>
+              <input type="text" id="productName" placeholder="e.g. Basmati Rice 25kg" required />
+            </div>
+            <div class="form-group">
+              <label for="productCategory">Category</label>
+              <select id="productCategory" required>
+                <option value="">Select Category</option>
+                <option value="Grains & Cereals">Grains & Cereals</option>
+                <option value="Dairy Products">Dairy Products</option>
+                <option value="Beverages">Beverages</option>
+                <option value="Snacks">Snacks</option>
+                <option value="Spices">Spices</option>
+                <option value="Canned Goods">Canned Goods</option>
+                <option value="Personal Care">Personal Care</option>
+                <option value="Cleaning Supplies">Cleaning Supplies</option>
+                <option value="Electronics">Electronics</option>
+                <option value="Stationery">Stationery</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="productCostPrice">Cost Price (₹)</label>
+              <input type="number" id="productCostPrice" placeholder="0.00" min="0" step="0.01" required />
+            </div>
+            <div class="form-group">
+              <label for="productPrice">Selling Price (₹)</label>
+              <input type="number" id="productPrice" placeholder="0.00" min="0" step="0.01" required />
+            </div>
+            <div class="form-group">
+              <label for="productStock">Stock Quantity</label>
+              <input type="number" id="productStock" placeholder="0" min="0" required />
+            </div>
+            <div class="form-group">
+              <label for="productSupplier">Supplier</label>
+              <select id="productSupplier" required>
+                <option value="">Select Supplier</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button type="submit" class="btn btn-primary" id="productSubmitBtn">➕ Add Product</button>
+            <button type="button" class="btn btn-danger" id="productCancelBtn" style="display:none;"
+              onclick="cancelProductEdit()">✖ Cancel</button>
+          </div>
+        </form>
       </div>
+
+      <!-- Product Table -->
       <div class="card">
-        <div class="card-title"><span class="icon">⭐</span> Low Stock Alerts</div>
-        <ul class="recent-list" id="lowStockList">
-          <li class="empty-state">
-            <div class="empty-icon">✅</div>
-            <p>All products are well stocked.</p>
-          </li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== PRODUCTS ===== -->
-  <section class="page-section" id="page-products">
-    <div class="page-header">
-      <h1>Products</h1>
-      <p>Manage your product inventory</p>
-    </div>
-
-    <!-- Add / Edit Product Form -->
-    <div class="card">
-      <div class="card-title"><span class="icon">➕</span> <span id="productFormTitle">Add New Product</span></div>
-      <form id="productForm">
-        <input type="hidden" id="productEditId" value="" />
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="productName">Product Name</label>
-            <input type="text" id="productName" placeholder="e.g. Basmati Rice 25kg" required />
-          </div>
-          <div class="form-group">
-            <label for="productCategory">Category</label>
-            <select id="productCategory" required>
-              <option value="">Select Category</option>
-              <option value="Grains & Cereals">Grains & Cereals</option>
-              <option value="Dairy Products">Dairy Products</option>
-              <option value="Beverages">Beverages</option>
-              <option value="Snacks">Snacks</option>
-              <option value="Spices">Spices</option>
-              <option value="Canned Goods">Canned Goods</option>
-              <option value="Personal Care">Personal Care</option>
-              <option value="Cleaning Supplies">Cleaning Supplies</option>
-              <option value="Electronics">Electronics</option>
-              <option value="Stationery">Stationery</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="productPrice">Price (₹)</label>
-            <input type="number" id="productPrice" placeholder="0.00" min="0" step="0.01" required />
-          </div>
-          <div class="form-group">
-            <label for="productStock">Stock Quantity</label>
-            <input type="number" id="productStock" placeholder="0" min="0" required />
-          </div>
-          <div class="form-group">
-            <label for="productSupplier">Supplier</label>
-            <select id="productSupplier" required>
-              <option value="">Select Supplier</option>
-            </select>
-          </div>
-        </div>
-        <div class="btn-group">
-          <button type="submit" class="btn btn-primary" id="productSubmitBtn">➕ Add Product</button>
-          <button type="button" class="btn btn-danger" id="productCancelBtn" style="display:none;" onclick="cancelProductEdit()">✖ Cancel</button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Product Table -->
-    <div class="card">
-      <div class="card-title"><span class="icon">📋</span> Product List</div>
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Product Name</th>
-              <th>Category</th>
-              <th>Price</th>
-              <th>Stock</th>
-              <th>Supplier</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="productTableBody">
-            <tr>
-              <td colspan="7">
-                <div class="empty-state">
-                  <div class="empty-icon">📦</div>
-                  <p>No products added yet.</p>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== SUPPLIERS ===== -->
-  <section class="page-section" id="page-suppliers">
-    <div class="page-header">
-      <h1>Suppliers</h1>
-      <p>Manage your supplier network</p>
-    </div>
-
-    <!-- Add Supplier Form -->
-    <div class="card">
-      <div class="card-title"><span class="icon">➕</span> <span id="supplierFormTitle">Add New Supplier</span></div>
-      <form id="supplierForm">
-        <input type="hidden" id="supplierEditId" value="" />
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="supplierName">Company Name</label>
-            <input type="text" id="supplierName" placeholder="e.g. FreshGoods Traders" required />
-          </div>
-          <div class="form-group">
-            <label for="supplierContact">Contact Person</label>
-            <input type="text" id="supplierContact" placeholder="e.g. Raj Kumar" required />
-          </div>
-          <div class="form-group">
-            <label for="supplierPhone">Phone</label>
-            <input type="tel" id="supplierPhone" placeholder="e.g. +91 9876543210" required />
-          </div>
-          <div class="form-group">
-            <label for="supplierEmail">Email</label>
-            <input type="email" id="supplierEmail" placeholder="e.g. info@freshgoods.com" />
-          </div>
-        </div>
-        <div class="btn-group">
-          <button type="submit" class="btn btn-primary" id="supplierSubmitBtn">➕ Add Supplier</button>
-          <button type="button" class="btn btn-danger" id="supplierCancelBtn" style="display:none;" onclick="cancelSupplierEdit()">✖ Cancel</button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Supplier Cards -->
-    <div class="card">
-      <div class="card-title"><span class="icon">🏭</span> Supplier Directory</div>
-      <div class="supplier-cards" id="supplierCardContainer">
-        <div class="empty-state" style="grid-column: 1/-1;">
-          <div class="empty-icon">🏭</div>
-          <p>No suppliers added yet.</p>
+        <div class="card-title"><span class="icon">📋</span> Product List</div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Product Name</th>
+                <th>Category</th>
+                <th>Cost Price</th>
+                <th>Sell Price</th>
+                <th>Profit/Unit</th>
+                <th>Stock</th>
+                <th>Supplier</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="productTableBody">
+              <tr>
+                <td colspan="9">
+                  <div class="empty-state">
+                    <div class="empty-icon">📦</div>
+                    <p>No products added yet.</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ===== CUSTOMERS ===== -->
-  <section class="page-section" id="page-customers">
-    <div class="page-header">
-      <h1>Customers</h1>
-      <p>Manage your customer base</p>
-    </div>
+    <!-- ===== SUPPLIERS ===== -->
+    <section class="page-section" id="page-suppliers">
+      <div class="page-header">
+        <h1>Suppliers</h1>
+        <p>Manage your supplier network</p>
+      </div>
 
-    <!-- Add Customer Form -->
-    <div class="card">
-      <div class="card-title"><span class="icon">➕</span> <span id="customerFormTitle">Add New Customer</span></div>
-      <form id="customerForm">
-        <input type="hidden" id="customerEditId" value="" />
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="customerName">Customer / Business Name</label>
-            <input type="text" id="customerName" placeholder="e.g. Metro Mart" required />
+      <!-- Add Supplier Form -->
+      <div class="card">
+        <div class="card-title"><span class="icon">➕</span> <span id="supplierFormTitle">Add New Supplier</span></div>
+        <form id="supplierForm">
+          <input type="hidden" id="supplierEditId" value="" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="supplierName">Company Name</label>
+              <input type="text" id="supplierName" placeholder="e.g. FreshGoods Traders" required />
+            </div>
+            <div class="form-group">
+              <label for="supplierContact">Contact Person</label>
+              <input type="text" id="supplierContact" placeholder="e.g. Raj Kumar" required />
+            </div>
+            <div class="form-group">
+              <label for="supplierPhone">Phone</label>
+              <input type="tel" id="supplierPhone" placeholder="e.g. +91 9876543210" required />
+            </div>
+            <div class="form-group">
+              <label for="supplierEmail">Email</label>
+              <input type="email" id="supplierEmail" placeholder="e.g. info@freshgoods.com" />
+            </div>
           </div>
-          <div class="form-group">
-            <label for="customerPhone">Phone</label>
-            <input type="tel" id="customerPhone" placeholder="e.g. +91 9876543210" required />
+          <div class="btn-group">
+            <button type="submit" class="btn btn-primary" id="supplierSubmitBtn">➕ Add Supplier</button>
+            <button type="button" class="btn btn-danger" id="supplierCancelBtn" style="display:none;"
+              onclick="cancelSupplierEdit()">✖ Cancel</button>
           </div>
-          <div class="form-group">
-            <label for="customerEmail">Email</label>
-            <input type="email" id="customerEmail" placeholder="e.g. orders@metromart.com" />
-          </div>
-          <div class="form-group">
-            <label for="customerAddress">Address</label>
-            <input type="text" id="customerAddress" placeholder="e.g. 42 Commercial St, Mumbai" />
+        </form>
+      </div>
+
+      <!-- Supplier Cards -->
+      <div class="card">
+        <div class="card-title"><span class="icon">🏭</span> Supplier Directory</div>
+        <div class="supplier-cards" id="supplierCardContainer">
+          <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="empty-icon">🏭</div>
+            <p>No suppliers added yet.</p>
           </div>
         </div>
-        <div class="btn-group">
-          <button type="submit" class="btn btn-primary" id="customerSubmitBtn">➕ Add Customer</button>
-          <button type="button" class="btn btn-danger" id="customerCancelBtn" style="display:none;" onclick="cancelCustomerEdit()">✖ Cancel</button>
+      </div>
+    </section>
+
+    <!-- ===== CUSTOMERS ===== -->
+    <section class="page-section" id="page-customers">
+      <div class="page-header">
+        <h1>Customers</h1>
+        <p>Manage your customer base</p>
+      </div>
+
+      <!-- Add Customer Form -->
+      <div class="card">
+        <div class="card-title"><span class="icon">➕</span> <span id="customerFormTitle">Add New Customer</span></div>
+        <form id="customerForm">
+          <input type="hidden" id="customerEditId" value="" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="customerName">Customer / Business Name</label>
+              <input type="text" id="customerName" placeholder="e.g. Metro Mart" required />
+            </div>
+            <div class="form-group">
+              <label for="customerPhone">Phone</label>
+              <input type="tel" id="customerPhone" placeholder="e.g. +91 9876543210" required />
+            </div>
+            <div class="form-group">
+              <label for="customerEmail">Email</label>
+              <input type="email" id="customerEmail" placeholder="e.g. orders@metromart.com" />
+            </div>
+            <div class="form-group">
+              <label for="customerAddress">Address</label>
+              <input type="text" id="customerAddress" placeholder="e.g. 42 Commercial St, Mumbai" />
+            </div>
+          </div>
+          <div class="btn-group">
+            <button type="submit" class="btn btn-primary" id="customerSubmitBtn">➕ Add Customer</button>
+            <button type="button" class="btn btn-danger" id="customerCancelBtn" style="display:none;"
+              onclick="cancelCustomerEdit()">✖ Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Customer Table -->
+      <div class="card">
+        <div class="card-title"><span class="icon">👥</span> Customer List</div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Address</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="customerTableBody">
+              <tr>
+                <td colspan="6">
+                  <div class="empty-state">
+                    <div class="empty-icon">👥</div>
+                    <p>No customers added yet.</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </form>
-    </div>
-
-    <!-- Customer Table -->
-    <div class="card">
-      <div class="card-title"><span class="icon">👥</span> Customer List</div>
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Email</th>
-              <th>Address</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="customerTableBody">
-            <tr>
-              <td colspan="6">
-                <div class="empty-state">
-                  <div class="empty-icon">👥</div>
-                  <p>No customers added yet.</p>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ===== ORDERS ===== -->
-  <section class="page-section" id="page-orders">
-    <div class="page-header">
-      <h1>Orders</h1>
-      <p>Create and track customer orders</p>
-    </div>
+    <!-- ===== ORDERS ===== -->
+    <section class="page-section" id="page-orders">
+      <div class="page-header">
+        <h1>Orders</h1>
+        <p>Create and track customer orders</p>
+      </div>
 
-    <!-- Create Order Form -->
-    <div class="card">
-      <div class="card-title"><span class="icon">➕</span> Create New Order</div>
-      <form id="orderForm">
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="orderCustomer">Customer</label>
-            <select id="orderCustomer" required>
-              <option value="">Select Customer</option>
-            </select>
+      <!-- Create Order Form -->
+      <div class="card">
+        <div class="card-title"><span class="icon">➕</span> Create New Order</div>
+        <form id="orderForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="orderCustomer">Customer</label>
+              <select id="orderCustomer" required>
+                <option value="">Select Customer</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="orderProduct">Product</label>
+              <select id="orderProduct" required>
+                <option value="">Select Product</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="orderQuantity">Quantity</label>
+              <input type="number" id="orderQuantity" placeholder="0" min="1" required />
+            </div>
+            <div class="form-group">
+              <label for="orderDiscount">Discount (%)</label>
+              <input type="number" id="orderDiscount" placeholder="0" min="0" max="100" value="0" />
+            </div>
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="orderSeasonalOffer" /> Apply Seasonal Offer (10% extra)
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="orderSubtotal">Subtotal <small style="color:var(--text-light)">auto</small></label>
+              <input type="text" id="orderSubtotal" placeholder="—" readonly />
+            </div>
+            <div class="form-group">
+              <label for="orderDiscountAmt">Discount Amount <small style="color:var(--text-light)">auto</small></label>
+              <input type="text" id="orderDiscountAmt" placeholder="—" readonly />
+            </div>
+            <div class="form-group">
+              <label for="orderTotal">Final Payable (₹) <small style="color:var(--text-light)">auto</small></label>
+              <input type="text" id="orderTotal" placeholder="—" readonly style="font-weight:700;font-size:16px;" />
+            </div>
           </div>
-          <div class="form-group">
-            <label for="orderProduct">Product</label>
-            <select id="orderProduct" required>
-              <option value="">Select Product</option>
-            </select>
+          <button type="submit" class="btn btn-primary">🛒 Place Order</button>
+        </form>
+      </div>
+
+      <!-- Orders Table -->
+      <div class="card">
+        <div class="card-title"><span class="icon">📋</span> Order History</div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Order #</th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Discount</th>
+                <th>Total</th>
+                <th>Profit</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="orderTableBody">
+              <tr>
+                <td colspan="10">
+                  <div class="empty-state">
+                    <div class="empty-icon">🛒</div>
+                    <p>No orders placed yet.</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PAYMENTS ===== -->
+    <section class="page-section" id="page-payments">
+      <div class="page-header">
+        <h1>Payments</h1>
+        <p>Track order payments and outstanding balances</p>
+      </div>
+
+      <!-- Payment Summary -->
+      <div class="payment-summary-grid">
+        <div class="payment-summary-card">
+          <h4>Total Revenue</h4>
+          <div class="amount text-success" id="payTotalRevenue">₹0</div>
+        </div>
+        <div class="payment-summary-card">
+          <h4>Payments Received</h4>
+          <div class="amount text-success" id="payReceived">₹0</div>
+        </div>
+        <div class="payment-summary-card">
+          <h4>Pending Amount</h4>
+          <div class="amount text-warning" id="payPending">₹0</div>
+        </div>
+      </div>
+
+      <!-- Record Payment -->
+      <div class="card">
+        <div class="card-title"><span class="icon">💳</span> Record Payment</div>
+        <form id="paymentForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="paymentOrder">Order</label>
+              <select id="paymentOrder" required>
+                <option value="">Select Order</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="paymentAmount">Amount (₹)</label>
+              <input type="number" id="paymentAmount" placeholder="0.00" min="0" step="0.01" required />
+            </div>
+            <div class="form-group">
+              <label for="paymentMethod">Method</label>
+              <select id="paymentMethod" required>
+                <option value="">Select Method</option>
+                <option value="Cash">Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="UPI">UPI</option>
+                <option value="Cheque">Cheque</option>
+                <option value="Credit">Credit</option>
+              </select>
+            </div>
           </div>
-          <div class="form-group">
-            <label for="orderQuantity">Quantity</label>
-            <input type="number" id="orderQuantity" placeholder="0" min="1" required />
-          </div>
-          <div class="form-group">
-            <label for="orderTotal">Total (₹) <small style="color:var(--text-light)">auto-calculated</small></label>
-            <input type="text" id="orderTotal" placeholder="—" readonly />
+          <button type="submit" class="btn btn-success">💳 Record Payment</button>
+        </form>
+      </div>
+
+      <!-- Payment History Table -->
+      <div class="card">
+        <div class="card-title"><span class="icon">📋</span> Payment History</div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Order #</th>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Method</th>
+              </tr>
+            </thead>
+            <tbody id="paymentTableBody">
+              <tr>
+                <td colspan="6">
+                  <div class="empty-state">
+                    <div class="empty-icon">💳</div>
+                    <p>No payments recorded yet.</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ANALYTICS ===== -->
+    <section class="page-section" id="page-analytics">
+      <div class="page-header">
+        <h1>Advanced Analytics</h1>
+        <p>Insights and performance metrics for your business</p>
+      </div>
+
+      <!-- Animated Counters -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon purple">💰</div>
+          <div class="stat-info">
+            <h3 id="animRevenue">₹0</h3>
+            <p>Total Revenue</p>
           </div>
         </div>
-        <button type="submit" class="btn btn-primary">🛒 Place Order</button>
-      </form>
-    </div>
-
-    <!-- Orders Table -->
-    <div class="card">
-      <div class="card-title"><span class="icon">📋</span> Order History</div>
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Order #</th>
-              <th>Date</th>
-              <th>Customer</th>
-              <th>Product</th>
-              <th>Qty</th>
-              <th>Total</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="orderTableBody">
-            <tr>
-              <td colspan="8">
-                <div class="empty-state">
-                  <div class="empty-icon">🛒</div>
-                  <p>No orders placed yet.</p>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== PAYMENTS ===== -->
-  <section class="page-section" id="page-payments">
-    <div class="page-header">
-      <h1>Payments</h1>
-      <p>Track order payments and outstanding balances</p>
-    </div>
-
-    <!-- Payment Summary -->
-    <div class="payment-summary-grid">
-      <div class="payment-summary-card">
-        <h4>Total Revenue</h4>
-        <div class="amount text-success" id="payTotalRevenue">₹0</div>
-      </div>
-      <div class="payment-summary-card">
-        <h4>Payments Received</h4>
-        <div class="amount text-success" id="payReceived">₹0</div>
-      </div>
-      <div class="payment-summary-card">
-        <h4>Pending Amount</h4>
-        <div class="amount text-warning" id="payPending">₹0</div>
-      </div>
-    </div>
-
-    <!-- Record Payment -->
-    <div class="card">
-      <div class="card-title"><span class="icon">💳</span> Record Payment</div>
-      <form id="paymentForm">
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="paymentOrder">Order</label>
-            <select id="paymentOrder" required>
-              <option value="">Select Order</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="paymentAmount">Amount (₹)</label>
-            <input type="number" id="paymentAmount" placeholder="0.00" min="0" step="0.01" required />
-          </div>
-          <div class="form-group">
-            <label for="paymentMethod">Method</label>
-            <select id="paymentMethod" required>
-              <option value="">Select Method</option>
-              <option value="Cash">Cash</option>
-              <option value="Bank Transfer">Bank Transfer</option>
-              <option value="UPI">UPI</option>
-              <option value="Cheque">Cheque</option>
-              <option value="Credit">Credit</option>
-            </select>
+        <div class="stat-card">
+          <div class="stat-icon orange">🛒</div>
+          <div class="stat-info">
+            <h3 id="animOrders">0</h3>
+            <p>Total Orders</p>
           </div>
         </div>
-        <button type="submit" class="btn btn-success">💳 Record Payment</button>
-      </form>
-    </div>
-
-    <!-- Payment History Table -->
-    <div class="card">
-      <div class="card-title"><span class="icon">📋</span> Payment History</div>
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Date</th>
-              <th>Order #</th>
-              <th>Customer</th>
-              <th>Amount</th>
-              <th>Method</th>
-            </tr>
-          </thead>
-          <tbody id="paymentTableBody">
-            <tr>
-              <td colspan="6">
-                <div class="empty-state">
-                  <div class="empty-icon">💳</div>
-                  <p>No payments recorded yet.</p>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="stat-card">
+          <div class="stat-icon green">🏆</div>
+          <div class="stat-info">
+            <h3 id="animBestProduct">—</h3>
+            <p>Most Profitable Product</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue">⭐</div>
+          <div class="stat-info">
+            <h3 id="animBestCustomer">—</h3>
+            <p>Most Active Customer</p>
+          </div>
+        </div>
       </div>
-    </div>
-  </section>
 
-</main>
+      <!-- Charts -->
+      <div class="charts-grid">
+        <div class="card chart-card">
+          <div class="card-title"><span class="icon">📊</span> Weekly Sales</div>
+          <div class="chart-container"><canvas id="weeklySalesChart"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="card-title"><span class="icon">📈</span> Monthly Revenue</div>
+          <div class="chart-container"><canvas id="monthlyRevenueChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card chart-card" style="max-width:560px;">
+        <div class="card-title"><span class="icon">🥧</span> Category-wise Sales</div>
+        <div class="chart-container chart-container-pie"><canvas id="categorySalesChart"></canvas></div>
+      </div>
+    </section>
 
-<!-- Toast container -->
-<div class="toast-container" id="toastContainer"></div>
+    <!-- ===== SETTINGS ===== -->
+    <section class="page-section" id="page-settings">
+      <div class="page-header">
+        <h1>Settings</h1>
+        <p>Backup, restore, and application preferences</p>
+      </div>
 
-<script src="script.js"></script>
+      <div class="settings-grid">
+        <div class="card">
+          <div class="card-title"><span class="icon">💾</span> Backup Data</div>
+          <p style="color:var(--text-light);margin-bottom:20px;font-size:14px;">Export all your data as a JSON file.
+            Keep it safe for future restoration.</p>
+          <button class="btn btn-primary" id="backupBtn">📥 Download Backup</button>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon">📤</span> Restore Data</div>
+          <p style="color:var(--text-light);margin-bottom:20px;font-size:14px;">Import a previously exported JSON backup
+            file to restore all data.</p>
+          <input type="file" id="restoreFile" accept=".json" style="display:none;" />
+          <button class="btn btn-success" id="restoreBtn">📤 Import Backup</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="script.js"></script>
 </body>
+
 </html>
