@@ -1,0 +1,132 @@
+import { useState } from 'react'
+import { getSuppliers, saveSuppliers, nextId, addNotification } from '../store'
+
+export default function Suppliers({ showToast, refresh }) {
+    const [suppliers, setSuppliers] = useState(getSuppliers())
+    const [editId, setEditId] = useState(null)
+    const [form, setForm] = useState({ name: '', phone: '', email: '', address: '' })
+
+    const resetForm = () => {
+        setForm({ name: '', phone: '', email: '', address: '' })
+        setEditId(null)
+    }
+
+    const reload = () => { setSuppliers(getSuppliers()); refresh() }
+
+    const handleSubmit = (e) => {
+        e.preventDefault()
+        const data = getSuppliers()
+        if (editId) {
+            const idx = data.findIndex(s => s.id === editId)
+            if (idx >= 0) {
+                data[idx] = { ...data[idx], name: form.name, phone: form.phone, email: form.email, address: form.address }
+                saveSuppliers(data)
+                showToast('Supplier updated successfully', 'success')
+                addNotification(`Supplier "${form.name}" updated`, 'info')
+            }
+        } else {
+            const newSup = {
+                id: nextId(data), name: form.name, phone: form.phone,
+                email: form.email, address: form.address
+            }
+            data.push(newSup)
+            saveSuppliers(data)
+            showToast('Supplier added successfully', 'success')
+            addNotification(`New supplier "${form.name}" added`, 'info')
+        }
+        resetForm()
+        reload()
+    }
+
+    const handleEdit = (s) => {
+        setEditId(s.id)
+        setForm({ name: s.name, phone: s.phone || '', email: s.email || '', address: s.address || '' })
+    }
+
+    const handleDelete = (id) => {
+        if (!confirm('Delete this supplier?')) return
+        const data = getSuppliers().filter(s => s.id !== id)
+        saveSuppliers(data)
+        showToast('Supplier deleted', 'error')
+        reload()
+    }
+
+    return (
+        <div className="page-enter">
+            <div className="page-header">
+                <h1>🏭 Suppliers</h1>
+                <p>Manage your supplier network</p>
+            </div>
+
+            {/* Form */}
+            <div className="card">
+                <div className="card-title">
+                    <span className="icon">➕</span> {editId ? 'Edit Supplier' : 'Add New Supplier'}
+                </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="form-grid">
+                        <div className="form-group">
+                            <label>Supplier Name</label>
+                            <input type="text" placeholder="e.g. ABC Distributors" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+                        </div>
+                        <div className="form-group">
+                            <label>Phone</label>
+                            <input type="text" placeholder="e.g. 9876543210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label>Email</label>
+                            <input type="email" placeholder="e.g. contact@abc.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                            <label>Address</label>
+                            <input type="text" placeholder="e.g. 123 Market Street" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
+                        </div>
+                    </div>
+                    <div className="btn-group">
+                        <button type="submit" className="btn btn-primary">
+                            {editId ? '💾 Update Supplier' : '➕ Add Supplier'}
+                        </button>
+                        {editId && (
+                            <button type="button" className="btn btn-danger" onClick={resetForm}>✖ Cancel</button>
+                        )}
+                    </div>
+                </form>
+            </div>
+
+            {/* Table */}
+            <div className="card">
+                <div className="card-title"><span className="icon">📋</span> Supplier List ({suppliers.length})</div>
+                <div className="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th><th>Supplier Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {suppliers.length === 0 ? (
+                                <tr><td colSpan={6}>
+                                    <div className="empty-state"><div className="empty-icon">🏭</div><p>No suppliers added yet. Add your first supplier above!</p></div>
+                                </td></tr>
+                            ) : suppliers.map((s, i) => (
+                                <tr key={s.id}>
+                                    <td>{i + 1}</td>
+                                    <td><strong>{s.name}</strong></td>
+                                    <td>{s.phone || '—'}</td>
+                                    <td>{s.email || '—'}</td>
+                                    <td>{s.address || '—'}</td>
+                                    <td>
+                                        <div className="btn-group">
+                                            <button className="btn btn-warning btn-sm" onClick={() => handleEdit(s)}>✏️</button>
+                                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s.id)}>🗑️</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    )
+}
