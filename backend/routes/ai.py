@@ -8,7 +8,7 @@ from sqlalchemy import func
 
 from database import get_db
 from models import Customer, Order, OrderItem, Product
-from schemas import ApiResponse
+from schemas import ApiResponse, AIRecommendation
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 logger = logging.getLogger("supplynest")

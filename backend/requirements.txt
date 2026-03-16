@@ -3,3 +3,5 @@ uvicorn[standard]
 pydantic
 sqlalchemy
 pymysql
+passlib[argon2]
+argon2-cffi

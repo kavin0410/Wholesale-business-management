@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from models import Base, Supplier, Product, Customer, Order, OrderItem, Payment, User
 
 # ── Config ────────────────────────────────────────────
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "supplynest.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "supplynest_v2.db")
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 logger = logging.getLogger("supplynest")
@@ -37,11 +37,12 @@ def init_db():
     logger.info("All tables created / verified in SQLite database '%s'", DB_PATH)
 
 
-# ── Hash helper (for seeding users) ──────────────────
-import hashlib
+# ── Security Helper (for seeding users) ──────────────
+from passlib.context import CryptContext
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
-def _hash(pw: str) -> str:
-    return hashlib.sha256(pw.encode()).hexdigest()
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
 
 # ── Seed Sample Data ─────────────────────────────────
@@ -56,9 +57,12 @@ def seed_sample_data():
 
         # ── Users (insert only if not present) ─────────
         for uname, pw, role in [("admin", "admin123", "admin"), ("staff", "staff123", "staff")]:
+            logger.info("Seeding user: %s with password: %s", uname, pw)
             existing = db.query(User).filter(User.username == uname).first()
             if not existing:
-                db.add(User(username=uname, password=_hash(pw), role=role))
+                hashed_pw = get_password_hash(pw)
+                logger.info("Hashed password for %s: %s", uname, hashed_pw)
+                db.add(User(username=uname, password=hashed_pw, role=role))
         db.flush()
 
         # ── Suppliers ─────────────────────────────────

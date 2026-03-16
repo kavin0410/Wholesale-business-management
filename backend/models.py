@@ -3,15 +3,21 @@ SupplyNest — SQLAlchemy ORM Models
 All table definitions for MySQL database 'wholesale_db'.
 """
 from sqlalchemy import (
-    Column, Integer, String, Float, Date, ForeignKey, Text
+    Column, Integer, String, Float, Date, ForeignKey, Text, DateTime
 )
 from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.sql import func
 
 Base = declarative_base()
 
 
+class TimestampMixin:
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
 # ── Users ─────────────────────────────────────────────
-class User(Base):
+class User(TimestampMixin, Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -21,7 +27,7 @@ class User(Base):
 
 
 # ── Suppliers ─────────────────────────────────────────
-class Supplier(Base):
+class Supplier(TimestampMixin, Base):
     __tablename__ = "suppliers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -34,7 +40,7 @@ class Supplier(Base):
 
 
 # ── Products ─────────────────────────────────────────
-class Product(Base):
+class Product(TimestampMixin, Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -50,7 +56,7 @@ class Product(Base):
 
 
 # ── Customers ────────────────────────────────────────
-class Customer(Base):
+class Customer(TimestampMixin, Base):
     __tablename__ = "customers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -63,7 +69,7 @@ class Customer(Base):
 
 
 # ── Orders ───────────────────────────────────────────
-class Order(Base):
+class Order(TimestampMixin, Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -77,7 +83,7 @@ class Order(Base):
 
 
 # ── Order Items ──────────────────────────────────────
-class OrderItem(Base):
+class OrderItem(TimestampMixin, Base):
     __tablename__ = "order_items"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -91,7 +97,7 @@ class OrderItem(Base):
 
 
 # ── Payments ─────────────────────────────────────────
-class Payment(Base):
+class Payment(TimestampMixin, Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -4,7 +4,7 @@ Request/response models for API validation.
 """
 from pydantic import BaseModel, Field
 from typing import Any, Optional, List
-from datetime import date
+from datetime import date, datetime
 
 
 # ── Generic API Response ─────────────────────────────
@@ -14,12 +14,18 @@ class ApiResponse(BaseModel):
     message: str = ""
 
 
+# ── Audit Base ───────────────────────────────────────
+class AuditedModelOut(BaseModel):
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
 # ── Auth ─────────────────────────────────────────────
 class LoginRequest(BaseModel):
     username: str
     password: str
 
-class UserOut(BaseModel):
+class UserOut(AuditedModelOut):
     id: int
     username: str
     role: str
@@ -32,7 +38,7 @@ class SupplierCreate(BaseModel):
     phone: str = ""
     address: str = ""
 
-class SupplierOut(BaseModel):
+class SupplierOut(AuditedModelOut):
     id: int
     name: str
     phone: Optional[str]
@@ -49,7 +55,7 @@ class ProductCreate(BaseModel):
     stock: int = 0
     supplier_id: Optional[int] = None
 
-class ProductOut(BaseModel):
+class ProductOut(AuditedModelOut):
     id: int
     name: str
     category: Optional[str]
@@ -67,7 +73,7 @@ class CustomerCreate(BaseModel):
     phone: str = ""
     address: str = ""
 
-class CustomerOut(BaseModel):
+class CustomerOut(AuditedModelOut):
     id: int
     name: str
     phone: Optional[str]
@@ -80,7 +86,7 @@ class OrderItemCreate(BaseModel):
     product_id: int
     quantity: int = Field(gt=0)
 
-class OrderItemOut(BaseModel):
+class OrderItemOut(AuditedModelOut):
     id: int
     product_id: int
     product_name: Optional[str] = None
@@ -94,7 +100,7 @@ class OrderCreate(BaseModel):
     customer_id: int
     items: List[OrderItemCreate]
 
-class OrderOut(BaseModel):
+class OrderOut(AuditedModelOut):
     id: int
     customer_id: int
     customer_name: Optional[str] = None
@@ -105,14 +111,13 @@ class OrderOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-
 # ── Payments ─────────────────────────────────────────
 class PaymentUpdate(BaseModel):
     amount: float
     payment_status: str
     payment_date: date
 
-class PaymentOut(BaseModel):
+class PaymentOut(AuditedModelOut):
     id: int
     order_id: int
     amount: float

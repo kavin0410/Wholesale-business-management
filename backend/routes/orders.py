@@ -3,13 +3,14 @@ Order routes — auto stock reduction, auto subtotal/total calculation,
 insufficient stock prevention. No delivery logic.
 """
 import logging
-from datetime import date
+from typing import List
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Order, OrderItem, Product, Customer, Payment
-from schemas import OrderCreate, ApiResponse, PaginatedResponse
+from models import Order
+from schemas import OrderCreate, OrderOut, ApiResponse, PaginatedResponse
+from services.order_service import order_service
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 logger = logging.getLogger("supplynest")
@@ -21,139 +22,48 @@ def list_orders(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
+    skip = (page - 1) * limit
     total = db.query(Order).count()
-    orders = (
-        db.query(Order)
-        .order_by(Order.id.desc())
-        .offset((page - 1) * limit)
-        .limit(limit)
-        .all()
-    )
+    orders = order_service.get_multi(db, skip=skip, limit=limit)
+    
     data = []
     for o in orders:
-        items = []
-        for item in o.order_items:
-            items.append({
-                "id": item.id,
-                "product_id": item.product_id,
-                "product_name": item.product.name if item.product else None,
-                "quantity": item.quantity,
-                "subtotal": item.subtotal,
-            })
-        data.append({
-            "id": o.id,
-            "customer_id": o.customer_id,
-            "customer_name": o.customer.name if o.customer else None,
-            "order_date": str(o.order_date),
-            "total_amount": o.total_amount,
-            "items": items,
-            "payment_status": o.payment.payment_status if o.payment else None,
-        })
+        o_out = OrderOut.model_validate(o)
+        o_out.customer_name = o.customer.name if o.customer else None
+        o_out.payment_status = o.payment.payment_status if o.payment else None
+        data.append(o_out)
+        
     return PaginatedResponse(data=data, total=total, page=page, limit=limit)
 
 
 @router.get("/{order_id}", response_model=ApiResponse)
 def get_order(order_id: int, db: Session = Depends(get_db)):
-    o = db.query(Order).filter(Order.id == order_id).first()
+    o = order_service.get(db, id=order_id)
     if not o:
         raise HTTPException(404, "Order not found")
-    items = []
-    for item in o.order_items:
-        items.append({
-            "id": item.id,
-            "product_id": item.product_id,
-            "product_name": item.product.name if item.product else None,
-            "quantity": item.quantity,
-            "subtotal": item.subtotal,
-        })
-    return ApiResponse(data={
-        "id": o.id,
-        "customer_id": o.customer_id,
-        "customer_name": o.customer.name if o.customer else None,
-        "order_date": str(o.order_date),
-        "total_amount": o.total_amount,
-        "items": items,
-        "payment_status": o.payment.payment_status if o.payment else None,
-    })
+    
+    o_out = OrderOut.model_validate(o)
+    o_out.customer_name = o.customer.name if o.customer else None
+    o_out.payment_status = o.payment.payment_status if o.payment else None
+    
+    return ApiResponse(data=o_out)
 
 
 @router.post("", response_model=ApiResponse, status_code=201)
 def create_order(body: OrderCreate, db: Session = Depends(get_db)):
-    # Validate customer exists
-    customer = db.query(Customer).filter(Customer.id == body.customer_id).first()
-    if not customer:
-        raise HTTPException(404, "Customer not found")
-
-    if not body.items:
-        raise HTTPException(400, "Order must have at least one item")
-
-    # Validate products and stock
-    total_amount = 0.0
-    order_items_data = []
-
-    for item in body.items:
-        product = db.query(Product).filter(Product.id == item.product_id).first()
-        if not product:
-            raise HTTPException(404, f"Product with id {item.product_id} not found")
-        if product.stock < item.quantity:
-            raise HTTPException(
-                400,
-                f"Insufficient stock for '{product.name}' "
-                f"(available: {product.stock}, requested: {item.quantity})"
-            )
-        subtotal = product.price * item.quantity
-        total_amount += subtotal
-        order_items_data.append({
-            "product": product,
-            "quantity": item.quantity,
-            "subtotal": subtotal,
-        })
-
-    # Create order
-    order = Order(
-        customer_id=body.customer_id,
-        order_date=date.today(),
-        total_amount=total_amount,
-    )
-    db.add(order)
-    db.flush()  # Get order.id
-
-    # Create order items and reduce stock
-    for item_data in order_items_data:
-        order_item = OrderItem(
-            order_id=order.id,
-            product_id=item_data["product"].id,
-            quantity=item_data["quantity"],
-            subtotal=item_data["subtotal"],
-        )
-        db.add(order_item)
-        # Reduce stock
-        item_data["product"].stock -= item_data["quantity"]
-
-    # Auto-create payment record (Pending)
-    payment = Payment(
-        order_id=order.id,
-        amount=0,
-        payment_status="Pending",
-        payment_date=date.today(),
-    )
-    db.add(payment)
-
-    db.commit()
-    db.refresh(order)
-
-    logger.info("Order created: id=%d total=%.2f", order.id, total_amount)
+    order = order_service.create_order(db, body=body)
+    logger.info("Order created: id=%d total=%.2f", order.id, order.total_amount)
     return ApiResponse(
-        data={"id": order.id, "total_amount": total_amount},
+        data={"id": order.id, "total_amount": order.total_amount},
         message="Order placed successfully"
     )
 
 
 @router.delete("/{order_id}", response_model=ApiResponse)
 def delete_order(order_id: int, db: Session = Depends(get_db)):
-    order = db.query(Order).filter(Order.id == order_id).first()
-    if not order:
+    o = order_service.get(db, id=order_id)
+    if not o:
         raise HTTPException(404, "Order not found")
-    db.delete(order)  # cascade deletes order_items and payment
-    db.commit()
+    
+    order_service.delete(db, id=order_id)
     return ApiResponse(message="Order deleted")

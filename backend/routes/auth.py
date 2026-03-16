@@ -1,10 +1,10 @@
 """Authentication routes — using SQLAlchemy ORM."""
-import hashlib
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from passlib.context import CryptContext
 
-from database import get_db
+from database import get_db, pwd_context
 from models import User
 from schemas import LoginRequest, ApiResponse
 
@@ -12,14 +12,18 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 logger = logging.getLogger("supplynest")
 
 
-def _hash(pw: str) -> str:
-    return hashlib.sha256(pw.encode()).hexdigest()
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
 
 @router.post("/login", response_model=ApiResponse)
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == req.username.lower()).first()
-    if not user or user.password != _hash(req.password):
+    if not user or not verify_password(req.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     logger.info("User '%s' logged in", req.username)
     return ApiResponse(

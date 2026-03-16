@@ -2,10 +2,12 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
+from typing import List
 
 from database import get_db
-from models import Product, Supplier
+from models import Product
 from schemas import ProductCreate, ProductOut, ApiResponse, PaginatedResponse
+from services.product_service import product_service
 
 router = APIRouter(prefix="/products", tags=["Products"])
 logger = logging.getLogger("supplynest")
@@ -17,83 +19,56 @@ def list_products(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
+    skip = (page - 1) * limit
     total = db.query(Product).count()
-    products = (
-        db.query(Product)
-        .order_by(Product.id.desc())
-        .offset((page - 1) * limit)
-        .limit(limit)
-        .all()
-    )
+    products = product_service.get_multi(db, skip=skip, limit=limit)
+    
+    # Enrich with supplier_name for frontend compatibility
     data = []
     for p in products:
-        data.append({
-            "id": p.id,
-            "name": p.name,
-            "category": p.category,
-            "price": p.price,
-            "cost_price": p.cost_price,
-            "stock": p.stock,
-            "supplier_id": p.supplier_id,
-            "supplier_name": p.supplier.name if p.supplier else None,
-        })
+        p_out = ProductOut.model_validate(p)
+        if p.supplier:
+            p_out.supplier_name = p.supplier.name
+        data.append(p_out)
+        
     return PaginatedResponse(data=data, total=total, page=page, limit=limit)
 
 
 @router.get("/{product_id}", response_model=ApiResponse)
 def get_product(product_id: int, db: Session = Depends(get_db)):
-    p = db.query(Product).filter(Product.id == product_id).first()
+    p = product_service.get(db, id=product_id)
     if not p:
         raise HTTPException(404, "Product not found")
-    return ApiResponse(data={
-        "id": p.id,
-        "name": p.name,
-        "category": p.category,
-        "price": p.price,
-        "cost_price": p.cost_price,
-        "stock": p.stock,
-        "supplier_id": p.supplier_id,
-        "supplier_name": p.supplier.name if p.supplier else None,
-    })
+    
+    p_out = ProductOut.model_validate(p)
+    if p.supplier:
+        p_out.supplier_name = p.supplier.name
+        
+    return ApiResponse(data=p_out)
 
 
 @router.post("", response_model=ApiResponse, status_code=201)
 def create_product(body: ProductCreate, db: Session = Depends(get_db)):
-    product = Product(
-        name=body.name,
-        category=body.category,
-        price=body.price,
-        cost_price=body.cost_price,
-        stock=body.stock,
-        supplier_id=body.supplier_id,
-    )
-    db.add(product)
-    db.commit()
-    db.refresh(product)
+    product = product_service.create(db, obj_in=body)
     logger.info("Product created: id=%d name=%s", product.id, product.name)
     return ApiResponse(data={"id": product.id}, message="Product created")
 
 
 @router.put("/{product_id}", response_model=ApiResponse)
 def update_product(product_id: int, body: ProductCreate, db: Session = Depends(get_db)):
-    product = db.query(Product).filter(Product.id == product_id).first()
+    product = product_service.get(db, id=product_id)
     if not product:
         raise HTTPException(404, "Product not found")
-    product.name = body.name
-    product.category = body.category
-    product.price = body.price
-    product.cost_price = body.cost_price
-    product.stock = body.stock
-    product.supplier_id = body.supplier_id
-    db.commit()
+    
+    product_service.update(db, db_obj=product, obj_in=body)
     return ApiResponse(data={"id": product_id}, message="Product updated")
 
 
 @router.delete("/{product_id}", response_model=ApiResponse)
 def delete_product(product_id: int, db: Session = Depends(get_db)):
-    product = db.query(Product).filter(Product.id == product_id).first()
+    product = product_service.get(db, id=product_id)
     if not product:
         raise HTTPException(404, "Product not found")
-    db.delete(product)
-    db.commit()
+    
+    product_service.delete(db, id=product_id)
     return ApiResponse(message="Product deleted")
