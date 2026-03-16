@@ -1,40 +1,51 @@
-import { useState } from 'react'
-import { getPayments, savePayments, getOrders, getCustomers, nextId, addNotification } from '../store'
+import { useState, useEffect } from 'react'
+import { fetchPayments, fetchOrders, fetchCustomers, updatePayment } from '../api'
 
 export default function Payments({ showToast, formatCurrency, refresh }) {
-    const [payments, setPayments] = useState(getPayments())
-    const orders = getOrders()
-    const customers = getCustomers()
-    const [form, setForm] = useState({ orderId: '', amount: '', method: '' })
+    const [payments, setPayments] = useState([])
+    const [orders, setOrders] = useState([])
+    // eslint-disable-next-line no-unused-vars
+    const [customers, setCustomers] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [editingPayment, setEditingPayment] = useState(null)
 
-    const reload = () => { setPayments(getPayments()); refresh() }
-
-    const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0)
-    const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0)
-    const pending = totalRevenue - totalPaid
-
-    const handleSubmit = (e) => {
-        e.preventDefault()
-        const order = orders.find(o => o.id === Number(form.orderId))
-        if (!order) return showToast('Select a valid order', 'error')
-        const cust = customers.find(c => c.id === order.customerId)
-
-        const data = getPayments()
-        const payment = {
-            id: nextId(data),
-            orderId: order.id,
-            customerId: order.customerId,
-            amount: Number(form.amount),
-            method: form.method,
-            date: new Date().toLocaleDateString(),
-        }
-        data.push(payment)
-        savePayments(data)
-        showToast('Payment recorded!', 'success')
-        addNotification(`Payment of ₹${form.amount} received from ${cust?.name || 'customer'}`, 'payment')
-        setForm({ orderId: '', amount: '', method: '' })
-        reload()
+    const loadData = () => {
+        setLoading(true)
+        Promise.all([fetchPayments(), fetchOrders(), fetchCustomers()])
+            .then(([pay, ord, cust]) => { setPayments(pay); setOrders(ord); setCustomers(cust) })
+            .catch(err => { console.error(err); showToast('Failed to load payments', 'error') })
+            .finally(() => setLoading(false))
     }
+
+    useEffect(() => { loadData() }, [])
+
+    const handleEditClick = (payment) => {
+        setEditingPayment({ ...payment })
+    }
+
+    const handleUpdate = async (e) => {
+        e.preventDefault()
+        if (!editingPayment) return
+
+        try {
+            await updatePayment(editingPayment.id, {
+                amount: parseFloat(editingPayment.amount),
+                payment_status: editingPayment.payment_status,
+                payment_date: editingPayment.payment_date
+            })
+            showToast('Payment updated successfully', 'success')
+            setEditingPayment(null)
+            loadData()
+            refresh() // Refresh global stats if needed
+        } catch (err) {
+            console.error(err)
+            showToast('Failed to update payment', 'error')
+        }
+    }
+
+    const totalRevenue = orders.reduce((s, o) => s + (o.total_amount || 0), 0)
+    const totalPaid = payments.filter(p => p.payment_status === 'Paid').reduce((s, p) => s + (p.amount || 0), 0)
+    const pending = totalRevenue - totalPaid
 
     return (
         <div className="page-enter">
@@ -59,64 +70,82 @@ export default function Payments({ showToast, formatCurrency, refresh }) {
             </div>
 
             <div className="card">
-                <div className="card-title"><span className="icon">💳</span> Record Payment</div>
-                <form onSubmit={handleSubmit}>
-                    <div className="form-grid">
-                        <div className="form-group">
-                            <label>Order</label>
-                            <select value={form.orderId} onChange={e => setForm({ ...form, orderId: e.target.value })} required>
-                                <option value="">Select Order</option>
-                                {orders.map(o => {
-                                    const cust = customers.find(c => c.id === o.customerId)
-                                    return <option key={o.id} value={o.id}>#{o.id} — {cust?.name || 'Unknown'} ({formatCurrency(o.total)})</option>
+                <div className="card-title"><span className="icon">📋</span> Payment Records</div>
+                {loading ? (
+                    <p style={{ textAlign: 'center', padding: 20 }}>Loading...</p>
+                ) : (
+                    <div className="table-wrapper">
+                        <table>
+                            <thead><tr><th>#</th><th>Date</th><th>Order #</th><th>Customer</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+                            <tbody>
+                                {payments.length === 0 ? (
+                                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon">💳</div><p>No payments recorded yet.</p></div></td></tr>
+                                ) : payments.map((p, i) => {
+                                    const statusClass = p.payment_status === 'Paid' ? 'status-delivered' : p.payment_status === 'Partial' ? 'status-pending' : 'status-cancelled'
+                                    return (
+                                        <tr key={p.id}>
+                                            <td>{i + 1}</td>
+                                            <td>{p.payment_date}</td>
+                                            <td><strong>#{p.order_id}</strong></td>
+                                            <td>{p.customer_name || '—'}</td>
+                                            <td className="text-success"><strong>{formatCurrency(p.amount)}</strong></td>
+                                            <td><span className={`status-badge ${statusClass}`}>{p.payment_status}</span></td>
+                                            <td>
+                                                <button className="btn-small" onClick={() => handleEditClick(p)}>Edit</button>
+                                            </td>
+                                        </tr>
+                                    )
                                 })}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Amount (₹)</label>
-                            <input type="number" placeholder="0.00" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} required />
-                        </div>
-                        <div className="form-group">
-                            <label>Method</label>
-                            <select value={form.method} onChange={e => setForm({ ...form, method: e.target.value })} required>
-                                <option value="">Select Method</option>
-                                <option value="Cash">Cash</option>
-                                <option value="Bank Transfer">Bank Transfer</option>
-                                <option value="UPI">UPI</option>
-                                <option value="Cheque">Cheque</option>
-                                <option value="Credit">Credit</option>
-                            </select>
-                        </div>
+                            </tbody>
+                        </table>
                     </div>
-                    <button type="submit" className="btn btn-success">💳 Record Payment</button>
-                </form>
+                )}
             </div>
 
-            <div className="card">
-                <div className="card-title"><span className="icon">📋</span> Payment History</div>
-                <div className="table-wrapper">
-                    <table>
-                        <thead><tr><th>#</th><th>Date</th><th>Order #</th><th>Customer</th><th>Amount</th><th>Method</th></tr></thead>
-                        <tbody>
-                            {payments.length === 0 ? (
-                                <tr><td colSpan={6}><div className="empty-state"><div className="empty-icon">💳</div><p>No payments recorded yet.</p></div></td></tr>
-                            ) : [...payments].reverse().map((p, i) => {
-                                const cust = customers.find(c => c.id === p.customerId)
-                                return (
-                                    <tr key={p.id}>
-                                        <td>{i + 1}</td>
-                                        <td>{p.date}</td>
-                                        <td><strong>#{p.orderId}</strong></td>
-                                        <td>{cust?.name || '—'}</td>
-                                        <td className="text-success"><strong>{formatCurrency(p.amount)}</strong></td>
-                                        <td><span className="status-badge status-delivered">{p.method}</span></td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
+            {/* Edit Modal */}
+            {editingPayment && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>Update Payment #{editingPayment.id}</h3>
+                        <form onSubmit={handleUpdate}>
+                            <div className="form-group">
+                                <label>Amount</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editingPayment.amount}
+                                    onChange={e => setEditingPayment({ ...editingPayment, amount: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Status</label>
+                                <select
+                                    value={editingPayment.payment_status}
+                                    onChange={e => setEditingPayment({ ...editingPayment, payment_status: e.target.value })}
+                                >
+                                    <option value="Pending">Pending</option>
+                                    <option value="Partial">Partial</option>
+                                    <option value="Paid">Paid</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Date</label>
+                                <input
+                                    type="date"
+                                    value={editingPayment.payment_date}
+                                    onChange={e => setEditingPayment({ ...editingPayment, payment_date: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div className="modal-actions">
+                                <button type="button" className="btn-secondary" onClick={() => setEditingPayment(null)}>Cancel</button>
+                                <button type="submit" className="btn-primary">Update</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     )
 }

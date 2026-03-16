@@ -5,8 +5,8 @@ Main application entry point.
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import init_db
-from routes import auth, products, customers, orders, payments, delivery, dashboard, ai
+from database import init_db, seed_sample_data
+from routes import auth, products, customers, orders, payments, dashboard, ai, suppliers
 
 # ── Logging ──────────────────────────────────────────
 logging.basicConfig(
@@ -20,7 +20,7 @@ logger = logging.getLogger("supplynest")
 app = FastAPI(
     title="SupplyNest API",
     description="Wholesale Business Management System — Backend",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 # ── CORS — allow React frontend ─────────────────────
@@ -33,14 +33,15 @@ app.add_middleware(
 )
 
 # ── Register routers under /api ──────────────────────
-for r in (auth, products, customers, orders, payments, delivery, dashboard, ai):
+for r in (auth, products, customers, orders, payments, dashboard, ai, suppliers):
     app.include_router(r.router, prefix="/api")
 
 # ── Startup ──────────────────────────────────────────
 @app.on_event("startup")
 def startup():
     init_db()
-    logger.info("SupplyNest API ready")
+    seed_sample_data()
+    logger.info("SupplyNest API v2.0 ready (SQLite)")
 
 @app.get("/")
 def root():

@@ -31,9 +31,8 @@ export default function DynamicIsland({
         { id: 'customers', emoji: '👥', label: 'Customers' },
         { id: 'suppliers', emoji: '🏭', label: 'Suppliers' },
         { id: 'orders', emoji: '🛒', label: 'Orders' },
-        { id: 'reports', emoji: '📈', label: 'Reports' },
         { id: 'payments', emoji: '💳', label: 'Payments' },
-        { id: 'delivery', emoji: '🚚', label: 'Delivery' },
+        { id: 'reports', emoji: '📈', label: 'Reports' },
     ]
 
     const unreadCount = notifications.filter(n => !n.read).length

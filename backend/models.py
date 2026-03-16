@@ -1,155 +1,103 @@
 """
-Pydantic request/response models — consistent API contract.
+SupplyNest — SQLAlchemy ORM Models
+All table definitions for MySQL database 'wholesale_db'.
 """
-from pydantic import BaseModel, Field
-from typing import Any, Optional, List
+from sqlalchemy import (
+    Column, Integer, String, Float, Date, ForeignKey, Text
+)
+from sqlalchemy.orm import relationship, declarative_base
+
+Base = declarative_base()
 
 
-# ── Generic wrapper ──────────────────────────────────
-class ApiResponse(BaseModel):
-    success: bool = True
-    data: Any = None
-    message: str = ""
+# ── Users ─────────────────────────────────────────────
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(100), unique=True, nullable=False)
+    password = Column(String(256), nullable=False)
+    role = Column(String(50), nullable=False, default="staff")
 
 
-# ── Auth ─────────────────────────────────────────────
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+# ── Suppliers ─────────────────────────────────────────
+class Supplier(Base):
+    __tablename__ = "suppliers"
 
-class UserOut(BaseModel):
-    id: int
-    username: str
-    role: str
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(200), nullable=False)
+    phone = Column(String(20))
+    address = Column(Text)
+
+    # One Supplier → Many Products
+    products = relationship("Product", back_populates="supplier")
 
 
 # ── Products ─────────────────────────────────────────
-class ProductCreate(BaseModel):
-    name: str
-    category: str = ""
-    cost_price: float = 0
-    price: float = 0
-    stock: int = 0
-    supplier_id: Optional[int] = None
+class Product(Base):
+    __tablename__ = "products"
 
-class ProductOut(BaseModel):
-    id: int
-    name: str
-    category: str
-    cost_price: float
-    price: float
-    stock: int
-    supplier_id: Optional[int]
-    supplier_name: Optional[str] = None
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(200), nullable=False)
+    category = Column(String(100))
+    price = Column(Float, nullable=False, default=0)
+    cost_price = Column(Float, nullable=False, default=0)
+    stock = Column(Integer, nullable=False, default=0)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"))
 
-
-# ── Suppliers ────────────────────────────────────────
-class SupplierCreate(BaseModel):
-    name: str
-    phone: str = ""
-    email: str = ""
-    address: str = ""
-
-class SupplierOut(BaseModel):
-    id: int
-    name: str
-    phone: str
-    email: str
-    address: str
+    supplier = relationship("Supplier", back_populates="products")
+    order_items = relationship("OrderItem", back_populates="product")
 
 
 # ── Customers ────────────────────────────────────────
-class CustomerCreate(BaseModel):
-    name: str
-    phone: str = ""
-    email: str = ""
-    address: str = ""
+class Customer(Base):
+    __tablename__ = "customers"
 
-class CustomerOut(BaseModel):
-    id: int
-    name: str
-    phone: str
-    email: str
-    address: str
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(200), nullable=False)
+    phone = Column(String(20))
+    address = Column(Text)
+
+    # One Customer → Many Orders
+    orders = relationship("Order", back_populates="customer")
 
 
 # ── Orders ───────────────────────────────────────────
-class OrderCreate(BaseModel):
-    customer_id: int
-    product_id: int
-    quantity: int = Field(gt=0)
-    discount: float = 0
-    seasonal: bool = False
+class Order(Base):
+    __tablename__ = "orders"
 
-class OrderOut(BaseModel):
-    id: int
-    customer_id: int
-    product_id: int
-    quantity: int
-    discount: float
-    discount_amt: float
-    total: float
-    profit: float
-    status: str
-    date: str
-    customer_name: Optional[str] = None
-    product_name: Optional[str] = None
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    order_date = Column(Date, nullable=False)
+    total_amount = Column(Float, nullable=False, default=0)
+
+    customer = relationship("Customer", back_populates="orders")
+    order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    payment = relationship("Payment", back_populates="order", uselist=False, cascade="all, delete-orphan")
+
+
+# ── Order Items ──────────────────────────────────────
+class OrderItem(Base):
+    __tablename__ = "order_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    subtotal = Column(Float, nullable=False, default=0)
+
+    order = relationship("Order", back_populates="order_items")
+    product = relationship("Product", back_populates="order_items")
 
 
 # ── Payments ─────────────────────────────────────────
-class PaymentCreate(BaseModel):
-    order_id: int
-    amount: float = Field(gt=0)
-    method: str
+class Payment(Base):
+    __tablename__ = "payments"
 
-class PaymentOut(BaseModel):
-    id: int
-    order_id: int
-    customer_id: int
-    amount: float
-    method: str
-    date: str
-    customer_name: Optional[str] = None
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    amount = Column(Float, nullable=False, default=0)
+    payment_status = Column(String(50), nullable=False, default="Pending")  # Paid, Pending, Partial
+    payment_date = Column(Date, nullable=False)
 
-
-# ── Delivery ─────────────────────────────────────────
-class DeliveryOut(BaseModel):
-    id: int
-    order_id: int
-    status: str
-    assigned_staff: Optional[str]
-    expected_date: Optional[str]
-    created_at: str
-    updated_at: str
-
-class DeliveryStatusUpdate(BaseModel):
-    status: str
-    role: str  # 'admin' or 'staff'
-
-class TimelineEntry(BaseModel):
-    status: str
-    timestamp: str
-    note: Optional[str] = None
-
-class DeliveryTrack(BaseModel):
-    order_details: dict
-    customer_details: dict
-    supplier_details: dict
-    delivery_details: dict
-
-
-# ── AI ───────────────────────────────────────────────
-class AIRecommendation(BaseModel):
-    recommended_products: List[dict]
-    confidence_score: float
-    reason: str
-
-
-# ── Pagination ───────────────────────────────────────
-class PaginatedResponse(BaseModel):
-    success: bool = True
-    data: List[Any]
-    total: int
-    page: int
-    limit: int
-    message: str = ""
+    order = relationship("Order", back_populates="payment")

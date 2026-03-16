@@ -1,74 +1,63 @@
-import { useState, useMemo } from 'react'
-import { getOrders, saveOrders, getProducts, saveProducts, getCustomers, nextId, addNotification } from '../store'
+import { useState, useEffect, useMemo } from 'react'
+import { fetchOrders, fetchProducts, fetchCustomers, createOrder, deleteOrder } from '../api'
 
 export default function Orders({ showToast, formatCurrency, refresh }) {
-    const [orders, setOrders] = useState(getOrders())
-    const products = getProducts()
-    const customers = getCustomers()
-    const [form, setForm] = useState({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false })
+    const [orders, setOrders] = useState([])
+    const [products, setProducts] = useState([])
+    const [customers, setCustomers] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [form, setForm] = useState({ customerId: '', productId: '', quantity: '' })
 
-    const reload = () => { setOrders(getOrders()); refresh() }
+    const loadData = () => {
+        setLoading(true)
+        Promise.all([fetchOrders(), fetchProducts(), fetchCustomers()])
+            .then(([o, p, c]) => { setOrders(o); setProducts(p); setCustomers(c) })
+            .catch(err => { console.error(err); showToast('Failed to load data', 'error') })
+            .finally(() => setLoading(false))
+    }
+
+    useEffect(() => { loadData() }, [])
 
     // Auto calc
     const calcResult = useMemo(() => {
         const prod = products.find(p => p.id === Number(form.productId))
-        if (!prod || !form.quantity || Number(form.quantity) <= 0) return { subtotal: 0, discountAmt: 0, total: 0 }
+        if (!prod || !form.quantity || Number(form.quantity) <= 0) return { subtotal: 0, total: 0 }
         const qty = Number(form.quantity)
         const subtotal = prod.price * qty
-        let discountPct = Number(form.discount) || 0
-        if (form.seasonal) discountPct += 10
-        discountPct = Math.min(discountPct, 100)
-        const discountAmt = subtotal * (discountPct / 100)
-        const total = subtotal - discountAmt
-        return { subtotal, discountAmt, total, discountPct }
+        return { subtotal, total: subtotal }
     }, [form, products])
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
         const prod = products.find(p => p.id === Number(form.productId))
-        const cust = customers.find(c => c.id === Number(form.customerId))
-        if (!prod || !cust) return showToast('Select customer and product', 'error')
+        if (!form.customerId || !prod) return showToast('Select customer and product', 'error')
         const qty = Number(form.quantity)
         if (qty > prod.stock) return showToast('Not enough stock!', 'error')
 
-        const data = getOrders()
-        const order = {
-            id: nextId(data),
-            customerId: cust.id,
-            productId: prod.id,
-            quantity: qty,
-            discount: calcResult.discountPct,
-            discountAmt: calcResult.discountAmt,
-            total: calcResult.total,
-            profit: (prod.price - prod.costPrice) * qty - calcResult.discountAmt,
-            status: 'Pending',
-            date: new Date().toLocaleDateString(),
+        try {
+            await createOrder({
+                customer_id: Number(form.customerId),
+                items: [{ product_id: prod.id, quantity: qty }]
+            })
+            showToast('Order placed successfully!', 'success')
+            setForm({ customerId: '', productId: '', quantity: '' })
+            loadData()
+            refresh()
+        } catch (err) {
+            showToast(err.message || 'Error placing order', 'error')
         }
-        data.push(order)
-        saveOrders(data)
-
-        // Update stock
-        const allProds = getProducts()
-        const pi = allProds.findIndex(p => p.id === prod.id)
-        if (pi >= 0) { allProds[pi].stock -= qty; saveProducts(allProds) }
-
-        showToast('Order placed successfully!', 'success')
-        addNotification(`Order #${order.id}: ${cust.name} ordered ${prod.name} ×${qty}`, 'order')
-        setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false })
-        reload()
     }
 
-    const handleStatus = (id, status) => {
-        const data = getOrders()
-        const o = data.find(x => x.id === id)
-        if (o) { o.status = status; saveOrders(data); showToast(`Order #${id} marked ${status}`, 'info'); reload() }
-    }
-
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (!confirm('Delete this order?')) return
-        saveOrders(getOrders().filter(o => o.id !== id))
-        showToast('Order deleted', 'error')
-        reload()
+        try {
+            await deleteOrder(id)
+            showToast('Order deleted', 'error')
+            loadData()
+            refresh()
+        } catch (err) {
+            showToast(err.message || 'Error deleting order', 'error')
+        }
     }
 
     return (
@@ -101,22 +90,8 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
                             <input type="number" placeholder="0" min="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} required />
                         </div>
                         <div className="form-group">
-                            <label>Discount (%)</label>
-                            <input type="number" placeholder="0" min="0" max="100" value={form.discount} onChange={e => setForm({ ...form, discount: e.target.value })} />
-                        </div>
-                        <div className="form-group">
-                            <label>
-                                <input type="checkbox" checked={form.seasonal} onChange={e => setForm({ ...form, seasonal: e.target.checked })} />
-                                Apply Seasonal Offer (10% extra)
-                            </label>
-                        </div>
-                        <div className="form-group">
                             <label>Subtotal <small style={{ color: 'var(--text-secondary)' }}>auto</small></label>
                             <input type="text" value={calcResult.subtotal ? formatCurrency(calcResult.subtotal) : '—'} readOnly />
-                        </div>
-                        <div className="form-group">
-                            <label>Discount Amount <small style={{ color: 'var(--text-secondary)' }}>auto</small></label>
-                            <input type="text" value={calcResult.discountAmt ? formatCurrency(calcResult.discountAmt) : '—'} readOnly />
                         </div>
                         <div className="form-group">
                             <label>Final Payable <small style={{ color: 'var(--text-secondary)' }}>auto</small></label>
@@ -129,42 +104,40 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
 
             <div className="card">
                 <div className="card-title"><span className="icon">📋</span> Order History</div>
-                <div className="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr><th>Order #</th><th>Date</th><th>Customer</th><th>Product</th><th>Qty</th><th>Discount</th><th>Total</th><th>Profit</th><th>Status</th><th>Actions</th></tr>
-                        </thead>
-                        <tbody>
-                            {orders.length === 0 ? (
-                                <tr><td colSpan={10}><div className="empty-state"><div className="empty-icon">🛒</div><p>No orders placed yet.</p></div></td></tr>
-                            ) : [...orders].reverse().map(o => {
-                                const prod = products.find(p => p.id === o.productId)
-                                const cust = customers.find(c => c.id === o.customerId)
-                                const statusClass = o.status === 'Delivered' ? 'status-delivered' : o.status === 'Cancelled' ? 'status-cancelled' : 'status-pending'
-                                return (
-                                    <tr key={o.id}>
-                                        <td><strong>#{o.id}</strong></td>
-                                        <td>{o.date}</td>
-                                        <td>{cust?.name || '—'}</td>
-                                        <td>{prod?.name || '—'}</td>
-                                        <td>{o.quantity}</td>
-                                        <td>{o.discount ? o.discount + '%' : '—'}</td>
-                                        <td className="text-success"><strong>{formatCurrency(o.total)}</strong></td>
-                                        <td className={o.profit >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(o.profit || 0)}</td>
-                                        <td><span className={`status-badge ${statusClass}`}>{o.status}</span></td>
-                                        <td>
-                                            <div className="btn-group">
-                                                {o.status === 'Pending' && <button className="btn btn-success btn-sm" onClick={() => handleStatus(o.id, 'Delivered')}>✅</button>}
-                                                {o.status === 'Pending' && <button className="btn btn-danger btn-sm" onClick={() => handleStatus(o.id, 'Cancelled')}>❌</button>}
-                                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(o.id)}>🗑️</button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                {loading ? (
+                    <p style={{ textAlign: 'center', padding: 20 }}>Loading...</p>
+                ) : (
+                    <div className="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr><th>Order #</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody>
+                                {orders.length === 0 ? (
+                                    <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon">🛒</div><p>No orders placed yet.</p></div></td></tr>
+                                ) : orders.map(o => {
+                                    const itemsSummary = (o.items || []).map(i => `${i.product_name || 'Item'} ×${i.quantity}`).join(', ')
+                                    const statusClass = o.payment_status === 'Paid' ? 'status-delivered' : o.payment_status === 'Partial' ? 'status-pending' : 'status-cancelled'
+                                    return (
+                                        <tr key={o.id}>
+                                            <td><strong>#{o.id}</strong></td>
+                                            <td>{o.order_date}</td>
+                                            <td>{o.customer_name || '—'}</td>
+                                            <td>{itemsSummary || '—'}</td>
+                                            <td className="text-success"><strong>{formatCurrency(o.total_amount)}</strong></td>
+                                            <td><span className={`status-badge ${statusClass}`}>{o.payment_status || 'Pending'}</span></td>
+                                            <td>
+                                                <div className="btn-group">
+                                                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(o.id)}>🗑️</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div>
     )

@@ -9,12 +9,8 @@ import Orders from './pages/Orders'
 import Payments from './pages/Payments'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
-import DeliveryTracking from './pages/DeliveryTracking'
 import Suppliers from './pages/Suppliers'
 import {
-    login as loginFn,
-    logout as logoutFn,
-    getAuth,
     getNotifications,
     markNotifRead,
     clearNotifications,
@@ -25,7 +21,9 @@ import {
 import { useToast } from './hooks/useToast'
 
 export default function App() {
-    const [auth, setAuth] = useState(getAuth())
+    const [auth, setAuth] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('wbms_auth')) } catch { return null }
+    })
     const [activePage, setActivePage] = useState('dashboard')
     const [currency, setCurrency] = useState(getSavedCurrency())
     const [notifications, setNotifications] = useState(getNotifications())
@@ -37,18 +35,13 @@ export default function App() {
         setNotifications(getNotifications())
     }, [])
 
-    const handleLogin = (username, password) => {
-        const result = loginFn(username, password)
-        if (result) {
-            setAuth(result)
-            showToast(`Welcome back, ${result.username}!`, 'success')
-            return result
-        }
-        return null
+    const handleLogin = (authData) => {
+        setAuth(authData)
+        showToast(`Welcome back, ${authData.username}!`, 'success')
     }
 
     const handleLogout = () => {
-        logoutFn()
+        localStorage.removeItem('wbms_auth')
         setAuth(null)
         setActivePage('dashboard')
         showToast('Logged out successfully', 'info')
@@ -96,7 +89,6 @@ export default function App() {
             case 'payments': return <Payments key={refreshKey} {...commonProps} />
             case 'reports': return <Reports key={refreshKey} {...commonProps} />
             case 'settings': return <Settings key={refreshKey} {...commonProps} />
-            case 'delivery': return <DeliveryTracking key={refreshKey} {...commonProps} auth={auth} />
             case 'suppliers': return <Suppliers key={refreshKey} {...commonProps} />
             default: return <Dashboard key={refreshKey} {...commonProps} />
         }

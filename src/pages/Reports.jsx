@@ -1,26 +1,39 @@
-import { useEffect, useRef, useMemo } from 'react'
-import { getProducts, getOrders, getCustomers } from '../store'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { fetchProducts, fetchOrders, fetchCustomers } from '../api'
 import { Chart, registerables } from 'chart.js'
 
 Chart.register(...registerables)
 
 export default function Reports({ formatCurrency }) {
-    const products = getProducts()
-    const orders = getOrders()
-    const customers = getCustomers()
+    const [products, setProducts] = useState([])
+    const [orders, setOrders] = useState([])
+    const [customers, setCustomers] = useState([])
+    const [loading, setLoading] = useState(true)
     const weeklyRef = useRef(null)
     const monthlyRef = useRef(null)
     const catRef = useRef(null)
     const chartsRef = useRef([])
 
-    const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0)
+    useEffect(() => {
+        Promise.all([fetchProducts(), fetchOrders(), fetchCustomers()])
+            .then(([p, o, c]) => { setProducts(p); setOrders(o); setCustomers(c) })
+            .catch(err => console.error('Reports fetch error:', err))
+            .finally(() => setLoading(false))
+    }, [])
+
+    const totalRevenue = orders.reduce((s, o) => s + (o.total_amount || 0), 0)
 
     // Most profitable product
     const bestProduct = useMemo(() => {
         const profitMap = {}
         orders.forEach(o => {
-            const p = products.find(pr => pr.id === o.productId)
-            if (p) profitMap[p.name] = (profitMap[p.name] || 0) + (o.profit || 0)
+            (o.items || []).forEach(item => {
+                const prod = products.find(p => p.id === item.product_id)
+                if (prod) {
+                    const profit = (prod.price - prod.cost_price) * item.quantity
+                    profitMap[prod.name] = (profitMap[prod.name] || 0) + profit
+                }
+            })
         })
         const entries = Object.entries(profitMap)
         return entries.length ? entries.sort((a, b) => b[1] - a[1])[0][0] : '—'
@@ -30,14 +43,15 @@ export default function Reports({ formatCurrency }) {
     const bestCustomer = useMemo(() => {
         const countMap = {}
         orders.forEach(o => {
-            const c = customers.find(cu => cu.id === o.customerId)
-            if (c) countMap[c.name] = (countMap[c.name] || 0) + 1
+            const name = o.customer_name || 'Unknown'
+            countMap[name] = (countMap[name] || 0) + 1
         })
         const entries = Object.entries(countMap)
         return entries.length ? entries.sort((a, b) => b[1] - a[1])[0][0] : '—'
-    }, [orders, customers])
+    }, [orders])
 
     useEffect(() => {
+        if (loading) return
         // Cleanup
         chartsRef.current.forEach(c => c?.destroy())
         chartsRef.current = []
@@ -58,9 +72,9 @@ export default function Reports({ formatCurrency }) {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         const weeklySales = new Array(7).fill(0)
         orders.forEach(o => {
-            const d = new Date(o.date)
+            const d = new Date(o.order_date)
             const day = d.getDay()
-            weeklySales[day === 0 ? 6 : day - 1] += o.total || 0
+            weeklySales[day === 0 ? 6 : day - 1] += o.total_amount || 0
         })
 
         if (weeklyRef.current) {
@@ -85,8 +99,8 @@ export default function Reports({ formatCurrency }) {
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
         const monthlyRevenue = new Array(12).fill(0)
         orders.forEach(o => {
-            const d = new Date(o.date)
-            monthlyRevenue[d.getMonth()] += o.total || 0
+            const d = new Date(o.order_date)
+            monthlyRevenue[d.getMonth()] += o.total_amount || 0
         })
 
         if (monthlyRef.current) {
@@ -113,8 +127,10 @@ export default function Reports({ formatCurrency }) {
         // Category pie
         const catSales = {}
         orders.forEach(o => {
-            const p = products.find(pr => pr.id === o.productId)
-            if (p) catSales[p.category] = (catSales[p.category] || 0) + (o.total || 0)
+            (o.items || []).forEach(item => {
+                const p = products.find(pr => pr.id === item.product_id)
+                if (p) catSales[p.category] = (catSales[p.category] || 0) + (item.subtotal || 0)
+            })
         })
 
         const catLabels = Object.keys(catSales)
@@ -146,7 +162,11 @@ export default function Reports({ formatCurrency }) {
         return () => {
             chartsRef.current.forEach(c => c?.destroy())
         }
-    }, [orders, products])
+    }, [orders, products, loading])
+
+    if (loading) {
+        return <div className="page-enter"><div className="card"><p style={{ textAlign: 'center', padding: 40 }}>Loading reports...</p></div></div>
+    }
 
     return (
         <div className="page-enter">

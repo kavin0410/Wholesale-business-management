@@ -1,25 +1,41 @@
-import { useMemo } from 'react'
-import { getProducts, getCustomers, getOrders, getPayments } from '../store'
+import { useState, useEffect, useMemo } from 'react'
+import { fetchProducts, fetchCustomers, fetchOrders, fetchPayments, fetchDashboardStats } from '../api'
 
 export default function Dashboard({ currency, formatCurrency }) {
-    const products = getProducts()
-    const customers = getCustomers()
-    const orders = getOrders()
-    const payments = getPayments()
+    const [products, setProducts] = useState([])
+    const [customers, setCustomers] = useState([])
+    const [orders, setOrders] = useState([])
+    const [payments, setPayments] = useState([])
+    const [loading, setLoading] = useState(true)
 
-    const totalSales = orders.reduce((s, o) => s + (o.total || 0), 0)
+    useEffect(() => {
+        Promise.all([fetchProducts(), fetchCustomers(), fetchOrders(), fetchPayments()])
+            .then(([p, c, o, pay]) => {
+                setProducts(p)
+                setCustomers(c)
+                setOrders(o)
+                setPayments(pay)
+            })
+            .catch(err => console.error('Dashboard fetch error:', err))
+            .finally(() => setLoading(false))
+    }, [])
+
+    const totalSales = orders.reduce((s, o) => s + (o.total_amount || 0), 0)
     const totalCost = orders.reduce((s, o) => {
-        const prod = products.find(p => p.id === o.productId)
-        return s + (prod ? prod.costPrice * o.quantity : 0)
+        // Approximate cost from items
+        return s + (o.items || []).reduce((is, item) => {
+            const prod = products.find(p => p.id === item.product_id)
+            return is + (prod ? prod.cost_price * item.quantity : 0)
+        }, 0)
     }, 0)
     const totalProfit = totalSales - totalCost
     const profitMargin = totalSales > 0 ? ((totalProfit / totalSales) * 100).toFixed(1) : '0.0'
-    const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0)
+    const totalPaid = payments.filter(p => p.payment_status === 'Paid').reduce((s, p) => s + (p.amount || 0), 0)
     const pendingAmt = totalSales - totalPaid
 
     // Recent orders (last 5)
     const recentOrders = useMemo(() => {
-        return [...orders].reverse().slice(0, 5)
+        return orders.slice(0, 5)
     }, [orders])
 
     // Low stock alerts
@@ -31,15 +47,21 @@ export default function Dashboard({ currency, formatCurrency }) {
     const freqOrdered = useMemo(() => {
         const counts = {}
         orders.forEach(o => {
-            const p = products.find(pr => pr.id === o.productId)
-            if (p) counts[p.name] = (counts[p.name] || 0) + o.quantity
+            (o.items || []).forEach(item => {
+                const name = item.product_name || 'Unknown'
+                counts[name] = (counts[name] || 0) + item.quantity
+            })
         })
         return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5)
-    }, [orders, products])
+    }, [orders])
 
     const restockItems = useMemo(() => {
         return products.filter(p => p.stock <= 5).slice(0, 5)
     }, [products])
+
+    if (loading) {
+        return <div className="page-enter"><div className="card"><p style={{ textAlign: 'center', padding: 40 }}>Loading dashboard...</p></div></div>
+    }
 
     return (
         <div className="page-enter">
@@ -129,13 +151,12 @@ export default function Dashboard({ currency, formatCurrency }) {
                             </li>
                         ) : (
                             recentOrders.map(o => {
-                                const prod = products.find(p => p.id === o.productId)
-                                const cust = customers.find(c => c.id === o.customerId)
+                                const itemNames = (o.items || []).map(i => i.product_name).join(', ') || 'Items'
                                 return (
                                     <li key={o.id}>
-                                        <strong>#{o.id}</strong> — {cust?.name || 'Unknown'} ordered {prod?.name || 'Unknown'} × {o.quantity}
+                                        <strong>#{o.id}</strong> — {o.customer_name || 'Unknown'} ordered {itemNames}
                                         <span style={{ float: 'right', fontWeight: 700, color: 'var(--success)' }}>
-                                            {formatCurrency(o.total)}
+                                            {formatCurrency(o.total_amount)}
                                         </span>
                                     </li>
                                 )

@@ -1,15 +1,29 @@
 import { useState } from 'react'
+import { apiLogin } from '../api'
 
 export default function LoginPage({ onLogin }) {
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
+    const [loading, setLoading] = useState(false)
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
         setError('')
-        const result = onLogin(username, password)
-        if (!result) setError('Invalid username or password')
+        setLoading(true)
+        try {
+            const result = await apiLogin(username, password)
+            if (result) {
+                localStorage.setItem('wbms_auth', JSON.stringify(result))
+                onLogin(result)
+            } else {
+                setError('Invalid username or password')
+            }
+        } catch (err) {
+            setError(err.message || 'Login failed. Is the backend running?')
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (
@@ -57,8 +71,9 @@ export default function LoginPage({ onLogin }) {
                         type="submit"
                         className="btn btn-primary"
                         style={{ width: '100%', justifyContent: 'center', padding: 14, fontSize: 16 }}
+                        disabled={loading}
                     >
-                        🔐 Sign In
+                        {loading ? '⏳ Signing in...' : '🔐 Sign In'}
                     </button>
 
                     <div className="login-hint">

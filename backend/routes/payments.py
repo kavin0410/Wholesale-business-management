@@ -1,49 +1,66 @@
-"""Payment routes."""
-from datetime import datetime
-from fastapi import APIRouter, HTTPException, Query
+"""Payment routes — list and view payments with SQLAlchemy ORM."""
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+
 from database import get_db
-from models import PaymentCreate, ApiResponse, PaginatedResponse
+from models import Payment, Order
+from schemas import ApiResponse, PaginatedResponse
+import schemas
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
 
 @router.get("", response_model=PaginatedResponse)
-def list_payments(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100)):
-    conn = get_db()
-    offset = (page - 1) * limit
-    total = conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0]
-    rows = conn.execute("""
-        SELECT p.*, c.name AS customer_name
-        FROM payments p
-        JOIN customers c ON p.customer_id = c.id
-        ORDER BY p.id DESC LIMIT ? OFFSET ?
-    """, (limit, offset)).fetchall()
-    conn.close()
-    return PaginatedResponse(data=[dict(r) for r in rows], total=total, page=page, limit=limit)
+def list_payments(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    total = db.query(Payment).count()
+    payments = (
+        db.query(Payment)
+        .order_by(Payment.id.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    data = []
+    for p in payments:
+        customer_name = None
+        if p.order and p.order.customer:
+            customer_name = p.order.customer.name
+        data.append({
+            "id": p.id,
+            "order_id": p.order_id,
+            "amount": p.amount,
+            "payment_status": p.payment_status,
+            "payment_date": str(p.payment_date),
+            "customer_name": customer_name,
+        })
+    return PaginatedResponse(data=data, total=total, page=page, limit=limit)
+
+
+@router.put("/{payment_id}", response_model=ApiResponse)
+def update_payment(payment_id: int, body: schemas.PaymentUpdate, db: Session = Depends(get_db)):
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        return ApiResponse(success=False, message="Payment not found")
+    
+    payment.amount = body.amount
+    payment.payment_status = body.payment_status
+    payment.payment_date = body.payment_date
+    db.commit()
+    db.refresh(payment)
+    return ApiResponse(success=True, message="Payment updated successfully", data=payment.id)
 
 
 @router.get("/summary", response_model=ApiResponse)
-def payment_summary():
-    conn = get_db()
-    revenue = conn.execute("SELECT COALESCE(SUM(total),0) FROM orders").fetchone()[0]
-    paid = conn.execute("SELECT COALESCE(SUM(amount),0) FROM payments").fetchone()[0]
-    conn.close()
-    return ApiResponse(data={"total_revenue": revenue, "total_paid": paid, "pending": revenue - paid})
-
-
-@router.post("", response_model=ApiResponse, status_code=201)
-def create_payment(body: PaymentCreate):
-    conn = get_db()
-    order = conn.execute("SELECT * FROM orders WHERE id=?", (body.order_id,)).fetchone()
-    if not order:
-        conn.close()
-        raise HTTPException(404, "Order not found")
-    now = datetime.now().strftime("%Y-%m-%d")
-    cur = conn.execute(
-        "INSERT INTO payments (order_id,customer_id,amount,method,date) VALUES (?,?,?,?,?)",
-        (body.order_id, order["customer_id"], body.amount, body.method, now)
-    )
-    conn.commit()
-    pid = cur.lastrowid
-    conn.close()
-    return ApiResponse(data={"id": pid}, message="Payment recorded")
+def payment_summary(db: Session = Depends(get_db)):
+    total_revenue = db.query(func.coalesce(func.sum(Order.total_amount), 0)).scalar()
+    total_paid = db.query(func.coalesce(func.sum(Payment.amount), 0)).scalar()
+    return ApiResponse(data={
+        "total_revenue": float(total_revenue),
+        "total_paid": float(total_paid),
+        "pending": float(total_revenue - total_paid),
+    })
