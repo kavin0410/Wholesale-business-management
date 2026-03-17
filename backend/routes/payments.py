@@ -1,14 +1,19 @@
-"""Payment routes."""
+"""Payment routes + RBAC."""
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from database import get_db
 from models import PaymentCreate, ApiResponse, PaginatedResponse
+from auth_middleware import require_permission
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
 
 @router.get("", response_model=PaginatedResponse)
-def list_payments(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100)):
+def list_payments(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    user: dict = Depends(require_permission("payments:view")),
+):
     conn = get_db()
     offset = (page - 1) * limit
     total = conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0]
@@ -23,7 +28,9 @@ def list_payments(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=10
 
 
 @router.get("/summary", response_model=ApiResponse)
-def payment_summary():
+def payment_summary(
+    user: dict = Depends(require_permission("payments:view")),
+):
     conn = get_db()
     revenue = conn.execute("SELECT COALESCE(SUM(total),0) FROM orders").fetchone()[0]
     paid = conn.execute("SELECT COALESCE(SUM(amount),0) FROM payments").fetchone()[0]
@@ -32,7 +39,10 @@ def payment_summary():
 
 
 @router.post("", response_model=ApiResponse, status_code=201)
-def create_payment(body: PaymentCreate):
+def create_payment(
+    body: PaymentCreate,
+    user: dict = Depends(require_permission("payments:create")),
+):
     conn = get_db()
     order = conn.execute("SELECT * FROM orders WHERE id=?", (body.order_id,)).fetchone()
     if not order:

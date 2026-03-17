@@ -1,9 +1,10 @@
-"""Delivery tracking routes — status workflow, timeline, role control."""
+"""Delivery tracking routes — status workflow, timeline, role control + RBAC."""
 import logging
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from models import DeliveryStatusUpdate, ApiResponse
+from auth_middleware import require_permission, get_current_user
 
 router = APIRouter(prefix="/delivery", tags=["Delivery"])
 logger = logging.getLogger("supplynest")
@@ -12,7 +13,9 @@ STATUS_FLOW = ["Packing Order", "Order Packed", "Delivery Travelling", "Delivere
 
 
 @router.get("/all", response_model=ApiResponse)
-def list_deliveries():
+def list_deliveries(
+    user: dict = Depends(require_permission("delivery:view")),
+):
     conn = get_db()
     rows = conn.execute("""
         SELECT d.*, o.total, o.date AS order_date,
@@ -28,7 +31,10 @@ def list_deliveries():
 
 
 @router.get("/{order_id}", response_model=ApiResponse)
-def get_delivery(order_id: int):
+def get_delivery(
+    order_id: int,
+    user: dict = Depends(require_permission("delivery:view")),
+):
     conn = get_db()
     d = conn.execute("SELECT * FROM deliveries WHERE order_id=?", (order_id,)).fetchone()
     if not d:
@@ -39,7 +45,10 @@ def get_delivery(order_id: int):
 
 
 @router.get("/track/{order_id}", response_model=ApiResponse)
-def track_delivery(order_id: int):
+def track_delivery(
+    order_id: int,
+    user: dict = Depends(require_permission("delivery:view")),
+):
     """Full tracking view — order, customer, supplier, delivery + timeline."""
     conn = get_db()
 
@@ -93,7 +102,11 @@ def track_delivery(order_id: int):
 
 
 @router.put("/update-status/{delivery_id}", response_model=ApiResponse)
-def update_delivery_status(delivery_id: int, body: DeliveryStatusUpdate):
+def update_delivery_status(
+    delivery_id: int,
+    body: DeliveryStatusUpdate,
+    user: dict = Depends(require_permission("delivery:edit")),
+):
     """Update delivery status — enforces forward-only flow + role check."""
     if body.status not in STATUS_FLOW:
         raise HTTPException(400, f"Invalid status. Must be one of: {STATUS_FLOW}")
@@ -112,14 +125,11 @@ def update_delivery_status(delivery_id: int, body: DeliveryStatusUpdate):
         conn.close()
         raise HTTPException(400, f"Cannot move from '{delivery['status']}' to '{body.status}'. Only forward transitions allowed.")
 
-    # Role check
-    if body.role == "staff" and target_idx != current_idx + 1:
+    # Use the server-verified role, not the body role
+    actual_role = user["role"]
+    if actual_role == "staff" and target_idx != current_idx + 1:
         conn.close()
         raise HTTPException(403, "Staff can only move to the next stage")
-
-    if body.role not in ("admin", "staff"):
-        conn.close()
-        raise HTTPException(403, "Invalid role")
 
     now = datetime.now().isoformat()
     conn.execute(
@@ -137,7 +147,7 @@ def update_delivery_status(delivery_id: int, body: DeliveryStatusUpdate):
 
     conn.commit()
     conn.close()
-    logger.info("Delivery #%d status → %s (by %s)", delivery_id, body.status, body.role)
+    logger.info("Delivery #%d status → %s (by %s, role=%s)", delivery_id, body.status, user["username"], actual_role)
     return ApiResponse(
         data={"id": delivery_id, "status": body.status},
         message=f"Delivery updated to '{body.status}'"

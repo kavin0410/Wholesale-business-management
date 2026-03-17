@@ -1,16 +1,21 @@
-"""Order routes — auto stock decrease + auto delivery creation."""
+"""Order routes — auto stock decrease + auto delivery creation + RBAC."""
 import logging
 from datetime import datetime, timedelta
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from database import get_db
 from models import OrderCreate, ApiResponse, PaginatedResponse
+from auth_middleware import require_permission, require_role
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 logger = logging.getLogger("supplynest")
 
 
 @router.get("", response_model=PaginatedResponse)
-def list_orders(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100)):
+def list_orders(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    user: dict = Depends(require_permission("orders:view")),
+):
     conn = get_db()
     offset = (page - 1) * limit
     total = conn.execute("SELECT COUNT(*) FROM orders").fetchone()[0]
@@ -26,7 +31,10 @@ def list_orders(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100)
 
 
 @router.post("", response_model=ApiResponse, status_code=201)
-def create_order(body: OrderCreate):
+def create_order(
+    body: OrderCreate,
+    user: dict = Depends(require_permission("orders:create")),
+):
     conn = get_db()
     # Validate product + stock
     prod = conn.execute("SELECT * FROM products WHERE id=?", (body.product_id,)).fetchone()
@@ -63,7 +71,7 @@ def create_order(body: OrderCreate):
 
     # Decrease stock
     conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", (body.quantity, body.product_id))
-    logger.info("Stock updated: product_id=%d decreased by %d", body.product_id, body.quantity)
+    logger.info("Stock updated: product_id=%d decreased by %d (by %s)", body.product_id, body.quantity, user["username"])
 
     # Auto-create delivery record
     now_ts = datetime.now().isoformat()
@@ -81,7 +89,7 @@ def create_order(body: OrderCreate):
 
     conn.commit()
     conn.close()
-    logger.info("Order created: id=%d total=%.2f", order_id, total)
+    logger.info("Order created by %s: id=%d total=%.2f", user["username"], order_id, total)
     return ApiResponse(
         data={"id": order_id, "total": total, "profit": profit, "delivery_id": delivery_id},
         message="Order placed successfully"
@@ -89,7 +97,11 @@ def create_order(body: OrderCreate):
 
 
 @router.put("/{order_id}/status", response_model=ApiResponse)
-def update_order_status(order_id: int, status: str = Query(...)):
+def update_order_status(
+    order_id: int,
+    status: str = Query(...),
+    user: dict = Depends(require_permission("orders:edit")),
+):
     valid = ("Pending", "Delivered", "Cancelled")
     if status not in valid:
         raise HTTPException(400, f"Status must be one of {valid}")
@@ -105,7 +117,10 @@ def update_order_status(order_id: int, status: str = Query(...)):
 
 
 @router.delete("/{order_id}", response_model=ApiResponse)
-def delete_order(order_id: int):
+def delete_order(
+    order_id: int,
+    user: dict = Depends(require_permission("orders:delete")),
+):
     conn = get_db()
     exists = conn.execute("SELECT id FROM orders WHERE id=?", (order_id,)).fetchone()
     if not exists:
@@ -116,4 +131,5 @@ def delete_order(order_id: int):
     conn.execute("DELETE FROM orders WHERE id=?", (order_id,))
     conn.commit()
     conn.close()
+    logger.info("Order deleted by %s: id=%d", user["username"], order_id)
     return ApiResponse(message="Order deleted")

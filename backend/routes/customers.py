@@ -1,13 +1,18 @@
-"""Customer routes with pagination."""
-from fastapi import APIRouter, HTTPException, Query
+"""Customer routes with pagination + RBAC."""
+from fastapi import APIRouter, HTTPException, Query, Depends
 from database import get_db
 from models import CustomerCreate, ApiResponse, PaginatedResponse
+from auth_middleware import require_permission
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
 
 
 @router.get("", response_model=PaginatedResponse)
-def list_customers(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100)):
+def list_customers(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    user: dict = Depends(require_permission("customers:view")),
+):
     conn = get_db()
     offset = (page - 1) * limit
     total = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
@@ -17,7 +22,10 @@ def list_customers(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=1
 
 
 @router.get("/{customer_id}", response_model=ApiResponse)
-def get_customer(customer_id: int):
+def get_customer(
+    customer_id: int,
+    user: dict = Depends(require_permission("customers:view")),
+):
     conn = get_db()
     row = conn.execute("SELECT * FROM customers WHERE id=?", (customer_id,)).fetchone()
     conn.close()
@@ -27,7 +35,10 @@ def get_customer(customer_id: int):
 
 
 @router.post("", response_model=ApiResponse, status_code=201)
-def create_customer(body: CustomerCreate):
+def create_customer(
+    body: CustomerCreate,
+    user: dict = Depends(require_permission("customers:create")),
+):
     conn = get_db()
     cur = conn.execute(
         "INSERT INTO customers (name,phone,email,address) VALUES (?,?,?,?)",
@@ -40,7 +51,11 @@ def create_customer(body: CustomerCreate):
 
 
 @router.put("/{customer_id}", response_model=ApiResponse)
-def update_customer(customer_id: int, body: CustomerCreate):
+def update_customer(
+    customer_id: int,
+    body: CustomerCreate,
+    user: dict = Depends(require_permission("customers:edit")),
+):
     conn = get_db()
     exists = conn.execute("SELECT id FROM customers WHERE id=?", (customer_id,)).fetchone()
     if not exists:
@@ -56,7 +71,10 @@ def update_customer(customer_id: int, body: CustomerCreate):
 
 
 @router.delete("/{customer_id}", response_model=ApiResponse)
-def delete_customer(customer_id: int):
+def delete_customer(
+    customer_id: int,
+    user: dict = Depends(require_permission("customers:delete")),
+):
     conn = get_db()
     exists = conn.execute("SELECT id FROM customers WHERE id=?", (customer_id,)).fetchone()
     if not exists:

@@ -1,13 +1,18 @@
 import { useState } from 'react'
-import { getProducts, saveProducts, getSuppliers, nextId, addNotification } from '../store'
+import { getProducts, saveProducts, getSuppliers, nextId, addNotification, hasPermission } from '../store'
 
-export default function Products({ showToast, formatCurrency, refresh }) {
+export default function Products({ showToast, formatCurrency, refresh, auth }) {
     const [products, setProducts] = useState(getProducts())
     const suppliers = getSuppliers()
     const [editId, setEditId] = useState(null)
     const [form, setForm] = useState({ name: '', category: '', costPrice: '', price: '', stock: '', supplierId: '' })
 
     const categories = ['Grains & Cereals', 'Dairy Products', 'Beverages', 'Snacks', 'Spices', 'Canned Goods', 'Personal Care', 'Cleaning Supplies', 'Electronics', 'Stationery', 'Other']
+
+    // RBAC checks
+    const canCreate = hasPermission('products:create')
+    const canEdit = hasPermission('products:edit')
+    const canDelete = hasPermission('products:delete')
 
     const resetForm = () => {
         setForm({ name: '', category: '', costPrice: '', price: '', stock: '', supplierId: '' })
@@ -18,6 +23,9 @@ export default function Products({ showToast, formatCurrency, refresh }) {
 
     const handleSubmit = (e) => {
         e.preventDefault()
+        if (editId && !canEdit) return showToast('⛔ You do not have permission to edit products', 'error')
+        if (!editId && !canCreate) return showToast('⛔ You do not have permission to add products', 'error')
+
         const data = getProducts()
         const supplierName = suppliers.find(s => s.id === Number(form.supplierId))?.name || ''
         if (editId) {
@@ -43,11 +51,13 @@ export default function Products({ showToast, formatCurrency, refresh }) {
     }
 
     const handleEdit = (p) => {
+        if (!canEdit) return showToast('⛔ You do not have permission to edit products', 'error')
         setEditId(p.id)
         setForm({ name: p.name, category: p.category, costPrice: String(p.costPrice), price: String(p.price), stock: String(p.stock), supplierId: String(p.supplierId || '') })
     }
 
     const handleDelete = (id) => {
+        if (!canDelete) return showToast('⛔ You do not have permission to delete products', 'error')
         if (!confirm('Delete this product?')) return
         const data = getProducts().filter(p => p.id !== id)
         saveProducts(data)
@@ -62,54 +72,56 @@ export default function Products({ showToast, formatCurrency, refresh }) {
                 <p>Manage your product inventory</p>
             </div>
 
-            {/* Form */}
-            <div className="card">
-                <div className="card-title">
-                    <span className="icon">➕</span> {editId ? 'Edit Product' : 'Add New Product'}
+            {/* Form — only show for users with create or edit permission */}
+            {(canCreate || canEdit) && (
+                <div className="card">
+                    <div className="card-title">
+                        <span className="icon">➕</span> {editId ? 'Edit Product' : 'Add New Product'}
+                    </div>
+                    <form onSubmit={handleSubmit}>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label>Product Name</label>
+                                <input type="text" placeholder="e.g. Basmati Rice 25kg" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+                            </div>
+                            <div className="form-group">
+                                <label>Category</label>
+                                <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} required>
+                                    <option value="">Select Category</option>
+                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Cost Price (₹)</label>
+                                <input type="number" placeholder="0.00" min="0" step="0.01" value={form.costPrice} onChange={e => setForm({ ...form, costPrice: e.target.value })} required />
+                            </div>
+                            <div className="form-group">
+                                <label>Selling Price (₹)</label>
+                                <input type="number" placeholder="0.00" min="0" step="0.01" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
+                            </div>
+                            <div className="form-group">
+                                <label>Stock Quantity</label>
+                                <input type="number" placeholder="0" min="0" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} required />
+                            </div>
+                            <div className="form-group">
+                                <label>Supplier</label>
+                                <select value={form.supplierId} onChange={e => setForm({ ...form, supplierId: e.target.value })} required>
+                                    <option value="">Select Supplier</option>
+                                    {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="btn-group">
+                            <button type="submit" className="btn btn-primary">
+                                {editId ? '💾 Update Product' : '➕ Add Product'}
+                            </button>
+                            {editId && (
+                                <button type="button" className="btn btn-danger" onClick={resetForm}>✖ Cancel</button>
+                            )}
+                        </div>
+                    </form>
                 </div>
-                <form onSubmit={handleSubmit}>
-                    <div className="form-grid">
-                        <div className="form-group">
-                            <label>Product Name</label>
-                            <input type="text" placeholder="e.g. Basmati Rice 25kg" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
-                        </div>
-                        <div className="form-group">
-                            <label>Category</label>
-                            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} required>
-                                <option value="">Select Category</option>
-                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Cost Price (₹)</label>
-                            <input type="number" placeholder="0.00" min="0" step="0.01" value={form.costPrice} onChange={e => setForm({ ...form, costPrice: e.target.value })} required />
-                        </div>
-                        <div className="form-group">
-                            <label>Selling Price (₹)</label>
-                            <input type="number" placeholder="0.00" min="0" step="0.01" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
-                        </div>
-                        <div className="form-group">
-                            <label>Stock Quantity</label>
-                            <input type="number" placeholder="0" min="0" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} required />
-                        </div>
-                        <div className="form-group">
-                            <label>Supplier</label>
-                            <select value={form.supplierId} onChange={e => setForm({ ...form, supplierId: e.target.value })} required>
-                                <option value="">Select Supplier</option>
-                                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    <div className="btn-group">
-                        <button type="submit" className="btn btn-primary">
-                            {editId ? '💾 Update Product' : '➕ Add Product'}
-                        </button>
-                        {editId && (
-                            <button type="button" className="btn btn-danger" onClick={resetForm}>✖ Cancel</button>
-                        )}
-                    </div>
-                </form>
-            </div>
+            )}
 
             {/* Table */}
             <div className="card">
@@ -119,12 +131,13 @@ export default function Products({ showToast, formatCurrency, refresh }) {
                         <thead>
                             <tr>
                                 <th>#</th><th>Product Name</th><th>Category</th><th>Cost Price</th>
-                                <th>Sell Price</th><th>Profit/Unit</th><th>Stock</th><th>Supplier</th><th>Actions</th>
+                                <th>Sell Price</th><th>Profit/Unit</th><th>Stock</th><th>Supplier</th>
+                                {(canEdit || canDelete) && <th>Actions</th>}
                             </tr>
                         </thead>
                         <tbody>
                             {products.length === 0 ? (
-                                <tr><td colSpan={9}>
+                                <tr><td colSpan={(canEdit || canDelete) ? 9 : 8}>
                                     <div className="empty-state"><div className="empty-icon">📦</div><p>No products added yet.</p></div>
                                 </td></tr>
                             ) : products.map((p, i) => (
@@ -137,12 +150,14 @@ export default function Products({ showToast, formatCurrency, refresh }) {
                                     <td className="text-success">{formatCurrency(p.price - p.costPrice)}</td>
                                     <td><span className={`status-badge ${p.stock <= 10 ? 'status-pending' : 'status-delivered'}`}>{p.stock}</span></td>
                                     <td>{p.supplierName}</td>
-                                    <td>
-                                        <div className="btn-group">
-                                            <button className="btn btn-warning btn-sm" onClick={() => handleEdit(p)}>✏️</button>
-                                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id)}>🗑️</button>
-                                        </div>
-                                    </td>
+                                    {(canEdit || canDelete) && (
+                                        <td>
+                                            <div className="btn-group">
+                                                {canEdit && <button className="btn btn-warning btn-sm" onClick={() => handleEdit(p)}>✏️</button>}
+                                                {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id)}>🗑️</button>}
+                                            </div>
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>

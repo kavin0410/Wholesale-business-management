@@ -1,9 +1,10 @@
-"""AI recommendation routes — with in-memory TTL cache."""
+"""AI recommendation routes — with in-memory TTL cache + RBAC."""
 import logging, time
 from collections import defaultdict
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from models import ApiResponse
+from auth_middleware import require_permission
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 logger = logging.getLogger("supplynest")
@@ -25,7 +26,10 @@ def _set_cache(customer_id: int, result: dict):
 
 
 @router.get("/recommendations/{customer_id}", response_model=ApiResponse)
-def get_recommendations(customer_id: int):
+def get_recommendations(
+    customer_id: int,
+    user: dict = Depends(require_permission("ai:view")),
+):
     cached = _get_cached(customer_id)
     if cached:
         logger.info("AI cache hit for customer %d", customer_id)

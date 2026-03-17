@@ -1,15 +1,20 @@
-"""Product routes with pagination."""
+"""Product routes with pagination + RBAC."""
 import logging
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from database import get_db
 from models import ProductCreate, ApiResponse, PaginatedResponse
+from auth_middleware import require_permission
 
 router = APIRouter(prefix="/products", tags=["Products"])
 logger = logging.getLogger("supplynest")
 
 
 @router.get("", response_model=PaginatedResponse)
-def list_products(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100)):
+def list_products(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    user: dict = Depends(require_permission("products:view")),
+):
     conn = get_db()
     offset = (page - 1) * limit
     total = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
@@ -25,7 +30,10 @@ def list_products(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=10
 
 
 @router.get("/{product_id}", response_model=ApiResponse)
-def get_product(product_id: int):
+def get_product(
+    product_id: int,
+    user: dict = Depends(require_permission("products:view")),
+):
     conn = get_db()
     row = conn.execute("""
         SELECT p.*, s.name AS supplier_name
@@ -39,7 +47,10 @@ def get_product(product_id: int):
 
 
 @router.post("", response_model=ApiResponse, status_code=201)
-def create_product(body: ProductCreate):
+def create_product(
+    body: ProductCreate,
+    user: dict = Depends(require_permission("products:create")),
+):
     conn = get_db()
     cur = conn.execute(
         "INSERT INTO products (name,category,cost_price,price,stock,supplier_id) VALUES (?,?,?,?,?,?)",
@@ -48,12 +59,16 @@ def create_product(body: ProductCreate):
     conn.commit()
     pid = cur.lastrowid
     conn.close()
-    logger.info("Product created: id=%d name=%s", pid, body.name)
+    logger.info("Product created by %s: id=%d name=%s", user["username"], pid, body.name)
     return ApiResponse(data={"id": pid}, message="Product created")
 
 
 @router.put("/{product_id}", response_model=ApiResponse)
-def update_product(product_id: int, body: ProductCreate):
+def update_product(
+    product_id: int,
+    body: ProductCreate,
+    user: dict = Depends(require_permission("products:edit")),
+):
     conn = get_db()
     exists = conn.execute("SELECT id FROM products WHERE id=?", (product_id,)).fetchone()
     if not exists:
@@ -65,11 +80,15 @@ def update_product(product_id: int, body: ProductCreate):
     )
     conn.commit()
     conn.close()
+    logger.info("Product updated by %s: id=%d", user["username"], product_id)
     return ApiResponse(data={"id": product_id}, message="Product updated")
 
 
 @router.delete("/{product_id}", response_model=ApiResponse)
-def delete_product(product_id: int):
+def delete_product(
+    product_id: int,
+    user: dict = Depends(require_permission("products:delete")),
+):
     conn = get_db()
     exists = conn.execute("SELECT id FROM products WHERE id=?", (product_id,)).fetchone()
     if not exists:
@@ -78,4 +97,5 @@ def delete_product(product_id: int):
     conn.execute("DELETE FROM products WHERE id=?", (product_id,))
     conn.commit()
     conn.close()
+    logger.info("Product deleted by %s: id=%d", user["username"], product_id)
     return ApiResponse(message="Product deleted")

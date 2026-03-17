@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { getPayments, savePayments, getOrders, getCustomers, nextId, addNotification } from '../store'
+import { getPayments, savePayments, getOrders, getCustomers, nextId, addNotification, hasPermission } from '../store'
 
-export default function Payments({ showToast, formatCurrency, refresh }) {
+export default function Payments({ showToast, formatCurrency, refresh, auth }) {
     const [payments, setPayments] = useState(getPayments())
     const orders = getOrders()
     const customers = getCustomers()
     const [form, setForm] = useState({ orderId: '', amount: '', method: '' })
+
+    // RBAC checks
+    const canCreate = hasPermission('payments:create')
 
     const reload = () => { setPayments(getPayments()); refresh() }
 
@@ -15,6 +18,8 @@ export default function Payments({ showToast, formatCurrency, refresh }) {
 
     const handleSubmit = (e) => {
         e.preventDefault()
+        if (!canCreate) return showToast('⛔ You do not have permission to record payments', 'error')
+
         const order = orders.find(o => o.id === Number(form.orderId))
         if (!order) return showToast('Select a valid order', 'error')
         const cust = customers.find(c => c.id === order.customerId)
@@ -58,39 +63,42 @@ export default function Payments({ showToast, formatCurrency, refresh }) {
                 </div>
             </div>
 
-            <div className="card">
-                <div className="card-title"><span className="icon">💳</span> Record Payment</div>
-                <form onSubmit={handleSubmit}>
-                    <div className="form-grid">
-                        <div className="form-group">
-                            <label>Order</label>
-                            <select value={form.orderId} onChange={e => setForm({ ...form, orderId: e.target.value })} required>
-                                <option value="">Select Order</option>
-                                {orders.map(o => {
-                                    const cust = customers.find(c => c.id === o.customerId)
-                                    return <option key={o.id} value={o.id}>#{o.id} — {cust?.name || 'Unknown'} ({formatCurrency(o.total)})</option>
-                                })}
-                            </select>
+            {/* Record Payment form — admin only */}
+            {canCreate && (
+                <div className="card">
+                    <div className="card-title"><span className="icon">💳</span> Record Payment</div>
+                    <form onSubmit={handleSubmit}>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label>Order</label>
+                                <select value={form.orderId} onChange={e => setForm({ ...form, orderId: e.target.value })} required>
+                                    <option value="">Select Order</option>
+                                    {orders.map(o => {
+                                        const cust = customers.find(c => c.id === o.customerId)
+                                        return <option key={o.id} value={o.id}>#{o.id} — {cust?.name || 'Unknown'} ({formatCurrency(o.total)})</option>
+                                    })}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Amount (₹)</label>
+                                <input type="number" placeholder="0.00" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} required />
+                            </div>
+                            <div className="form-group">
+                                <label>Method</label>
+                                <select value={form.method} onChange={e => setForm({ ...form, method: e.target.value })} required>
+                                    <option value="">Select Method</option>
+                                    <option value="Cash">Cash</option>
+                                    <option value="Bank Transfer">Bank Transfer</option>
+                                    <option value="UPI">UPI</option>
+                                    <option value="Cheque">Cheque</option>
+                                    <option value="Credit">Credit</option>
+                                </select>
+                            </div>
                         </div>
-                        <div className="form-group">
-                            <label>Amount (₹)</label>
-                            <input type="number" placeholder="0.00" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} required />
-                        </div>
-                        <div className="form-group">
-                            <label>Method</label>
-                            <select value={form.method} onChange={e => setForm({ ...form, method: e.target.value })} required>
-                                <option value="">Select Method</option>
-                                <option value="Cash">Cash</option>
-                                <option value="Bank Transfer">Bank Transfer</option>
-                                <option value="UPI">UPI</option>
-                                <option value="Cheque">Cheque</option>
-                                <option value="Credit">Credit</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button type="submit" className="btn btn-success">💳 Record Payment</button>
-                </form>
-            </div>
+                        <button type="submit" className="btn btn-success">💳 Record Payment</button>
+                    </form>
+                </div>
+            )}
 
             <div className="card">
                 <div className="card-title"><span className="icon">📋</span> Payment History</div>

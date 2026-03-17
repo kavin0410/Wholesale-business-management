@@ -1,12 +1,17 @@
 import { useState, useMemo } from 'react'
-import { getOrders, saveOrders, getProducts, saveProducts, getCustomers, nextId, addNotification, savePayments, getPayments } from '../store'
+import { getOrders, saveOrders, getProducts, saveProducts, getCustomers, nextId, addNotification, savePayments, getPayments, hasPermission } from '../store'
 import { generateInvoice } from '../utils/exportUtils'
 
-export default function Orders({ showToast, formatCurrency, refresh }) {
+export default function Orders({ showToast, formatCurrency, refresh, auth }) {
     const [orders, setOrders] = useState(getOrders())
     const products = getProducts()
     const customers = getCustomers()
     const [form, setForm] = useState({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
+
+    // RBAC checks
+    const canCreate = hasPermission('orders:create')
+    const canEdit = hasPermission('orders:edit')
+    const canDelete = hasPermission('orders:delete')
 
     const reload = () => { setOrders(getOrders()); refresh() }
 
@@ -76,6 +81,8 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
 
     const handleSubmit = (e) => {
         e.preventDefault()
+        if (!canCreate) return showToast('⛔ You do not have permission to create orders', 'error')
+
         const prod = products.find(p => p.id === Number(form.productId))
         const cust = customers.find(c => c.id === Number(form.customerId))
         if (!prod || !cust) return showToast('Select customer and product', 'error')
@@ -134,12 +141,14 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
     }
 
     const handleStatus = (id, status) => {
+        if (!canEdit) return showToast('⛔ You do not have permission to change order status', 'error')
         const data = getOrders()
         const o = data.find(x => x.id === id)
         if (o) { o.status = status; saveOrders(data); showToast(`Order #${id} marked ${status}`, 'info'); reload() }
     }
 
     const handleDelete = (id) => {
+        if (!canDelete) return showToast('⛔ You do not have permission to delete orders', 'error')
         if (!confirm('Delete this order?')) return
         saveOrders(getOrders().filter(o => o.id !== id))
         showToast('Order deleted', 'error')
@@ -153,66 +162,69 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
                 <p>Create and track customer orders</p>
             </div>
 
-            <div className="card">
-                <div className="card-title"><span className="icon">➕</span> Create New Order</div>
-                <form onSubmit={handleSubmit}>
-                    <div className="form-grid">
-                        <div className="form-group">
-                            <label>Customer</label>
-                            <select value={form.customerId} onChange={e => setForm({ ...form, customerId: e.target.value })} required>
-                                <option value="">Select Customer</option>
-                                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
+            {/* Create Order form — staff and admin can both create */}
+            {canCreate && (
+                <div className="card">
+                    <div className="card-title"><span className="icon">➕</span> Create New Order</div>
+                    <form onSubmit={handleSubmit}>
+                        <div className="form-grid">
+                            <div className="form-group">
+                                <label>Customer</label>
+                                <select value={form.customerId} onChange={e => setForm({ ...form, customerId: e.target.value })} required>
+                                    <option value="">Select Customer</option>
+                                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Product</label>
+                                <select value={form.productId} onChange={e => setForm({ ...form, productId: e.target.value })} required>
+                                    <option value="">Select Product</option>
+                                    {products.map(p => <option key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</option>)}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Quantity</label>
+                                <input type="number" placeholder="0" min="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} required />
+                            </div>
+                            <div className="form-group">
+                                <label>Discount (%)</label>
+                                <input type="number" placeholder="0" min="0" max="100" value={form.discount} onChange={e => setForm({ ...form, discount: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label>Payment Method</label>
+                                <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} required>
+                                    <option value="Cash">Cash</option>
+                                    <option value="UPI">UPI</option>
+                                    <option value="QR Code">QR Code</option>
+                                    <option value="Debit Card">Debit Card</option>
+                                    <option value="Credit Card">Credit Card</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>
+                                    <input type="checkbox" checked={form.seasonal} onChange={e => setForm({ ...form, seasonal: e.target.checked })} />
+                                    Apply Seasonal Offer (10% extra)
+                                </label>
+                            </div>
+                            <div className="form-group">
+                                <label>Subtotal <small style={{ color: 'var(--text-secondary)' }}>auto</small></label>
+                                <input type="text" value={calcResult.subtotal ? formatCurrency(calcResult.subtotal) : '—'} readOnly />
+                            </div>
+                            <div className="form-group">
+                                <label>Discount Amount <small style={{ color: 'var(--text-secondary)' }}>auto</small></label>
+                                <input type="text" value={calcResult.discountAmt ? formatCurrency(calcResult.discountAmt) : '—'} readOnly />
+                            </div>
+                            <div className="form-group">
+                                <label>Final Payable <small style={{ color: 'var(--text-secondary)' }}>auto</small></label>
+                                <input type="text" value={calcResult.total ? formatCurrency(calcResult.total) : '—'} readOnly style={{ fontWeight: 700, fontSize: 16 }} />
+                            </div>
                         </div>
-                        <div className="form-group">
-                            <label>Product</label>
-                            <select value={form.productId} onChange={e => setForm({ ...form, productId: e.target.value })} required>
-                                <option value="">Select Product</option>
-                                {products.map(p => <option key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</option>)}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Quantity</label>
-                            <input type="number" placeholder="0" min="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} required />
-                        </div>
-                        <div className="form-group">
-                            <label>Discount (%)</label>
-                            <input type="number" placeholder="0" min="0" max="100" value={form.discount} onChange={e => setForm({ ...form, discount: e.target.value })} />
-                        </div>
-                        <div className="form-group">
-                            <label>Payment Method</label>
-                            <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} required>
-                                <option value="Cash">Cash</option>
-                                <option value="UPI">UPI</option>
-                                <option value="QR Code">QR Code</option>
-                                <option value="Debit Card">Debit Card</option>
-                                <option value="Credit Card">Credit Card</option>
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>
-                                <input type="checkbox" checked={form.seasonal} onChange={e => setForm({ ...form, seasonal: e.target.checked })} />
-                                Apply Seasonal Offer (10% extra)
-                            </label>
-                        </div>
-                        <div className="form-group">
-                            <label>Subtotal <small style={{ color: 'var(--text-secondary)' }}>auto</small></label>
-                            <input type="text" value={calcResult.subtotal ? formatCurrency(calcResult.subtotal) : '—'} readOnly />
-                        </div>
-                        <div className="form-group">
-                            <label>Discount Amount <small style={{ color: 'var(--text-secondary)' }}>auto</small></label>
-                            <input type="text" value={calcResult.discountAmt ? formatCurrency(calcResult.discountAmt) : '—'} readOnly />
-                        </div>
-                        <div className="form-group">
-                            <label>Final Payable <small style={{ color: 'var(--text-secondary)' }}>auto</small></label>
-                            <input type="text" value={calcResult.total ? formatCurrency(calcResult.total) : '—'} readOnly style={{ fontWeight: 700, fontSize: 16 }} />
-                        </div>
-                    </div>
-                    <button type="submit" className="btn btn-primary">
-                        {['Cash'].includes(form.paymentMethod) ? '🛒 Place Order' : '💳 Proceed to Pay'}
-                    </button>
-                </form>
-            </div>
+                        <button type="submit" className="btn btn-primary">
+                            {['Cash'].includes(form.paymentMethod) ? '🛒 Place Order' : '💳 Proceed to Pay'}
+                        </button>
+                    </form>
+                </div>
+            )}
 
             <div className="card">
                 <div className="card-title"><span className="icon">📋</span> Order History</div>
@@ -242,9 +254,9 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
                                         <td>
                                             <div className="btn-group">
                                                  <button className="btn btn-info btn-sm" title="Download Invoice" onClick={() => generateInvoice(o, cust, prod)}>📄</button>
-                                                 {o.status === 'Pending' && <button className="btn btn-success btn-sm" onClick={() => handleStatus(o.id, 'Delivered')}>✅</button>}
-                                                 {o.status === 'Pending' && <button className="btn btn-danger btn-sm" onClick={() => handleStatus(o.id, 'Cancelled')}>❌</button>}
-                                                 <button className="btn btn-danger btn-sm" onClick={() => handleDelete(o.id)}>🗑️</button>
+                                                 {canEdit && o.status === 'Pending' && <button className="btn btn-success btn-sm" onClick={() => handleStatus(o.id, 'Delivered')}>✅</button>}
+                                                 {canEdit && o.status === 'Pending' && <button className="btn btn-danger btn-sm" onClick={() => handleStatus(o.id, 'Cancelled')}>❌</button>}
+                                                 {canDelete && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(o.id)}>🗑️</button>}
                                             </div>
                                         </td>
                                     </tr>

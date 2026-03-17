@@ -21,6 +21,8 @@ import {
     getSavedCurrency,
     saveCurrency,
     formatCurrency as formatCurrencyFn,
+    canAccessPage,
+    hasPermission,
 } from './store'
 import { useToast } from './hooks/useToast'
 
@@ -75,6 +77,15 @@ export default function App() {
         return formatCurrencyFn(amount, currency)
     }, [currency])
 
+    // Page navigation with access control
+    const handleNavigate = (page) => {
+        if (canAccessPage(page)) {
+            setActivePage(page)
+        } else {
+            showToast('⛔ Access denied. You do not have permission to view this page.', 'error')
+        }
+    }
+
     // Not logged in
     if (!auth) {
         return (
@@ -85,9 +96,15 @@ export default function App() {
         )
     }
 
-    // Render active page
+    // Render active page (with permission check)
     const renderPage = () => {
-        const commonProps = { showToast, formatCurrency: fmtCurrency, refresh, currency }
+        const commonProps = { showToast, formatCurrency: fmtCurrency, refresh, currency, auth }
+
+        // If user somehow lands on a page they can't access, redirect to dashboard
+        if (!canAccessPage(activePage)) {
+            return <Dashboard key={refreshKey} {...commonProps} />
+        }
+
         switch (activePage) {
             case 'dashboard': return <Dashboard key={refreshKey} {...commonProps} />
             case 'products': return <Products key={refreshKey} {...commonProps} />
@@ -96,7 +113,7 @@ export default function App() {
             case 'payments': return <Payments key={refreshKey} {...commonProps} />
             case 'reports': return <Reports key={refreshKey} {...commonProps} />
             case 'settings': return <Settings key={refreshKey} {...commonProps} />
-            case 'delivery': return <DeliveryTracking key={refreshKey} {...commonProps} auth={auth} />
+            case 'delivery': return <DeliveryTracking key={refreshKey} {...commonProps} />
             case 'suppliers': return <Suppliers key={refreshKey} {...commonProps} />
             default: return <Dashboard key={refreshKey} {...commonProps} />
         }
@@ -106,7 +123,7 @@ export default function App() {
         <>
             <DynamicIsland
                 activePage={activePage}
-                onNavigate={setActivePage}
+                onNavigate={handleNavigate}
                 notifications={notifications}
                 onClearNotifications={handleClearNotifs}
                 onMarkRead={handleMarkRead}

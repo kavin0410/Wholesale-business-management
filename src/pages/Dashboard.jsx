@@ -1,11 +1,13 @@
 import { useMemo } from 'react'
-import { getProducts, getCustomers, getOrders, getPayments } from '../store'
+import { getProducts, getCustomers, getOrders, getPayments, hasPermission, isAdmin } from '../store'
 
-export default function Dashboard({ currency, formatCurrency }) {
+export default function Dashboard({ currency, formatCurrency, auth }) {
     const products = getProducts()
     const customers = getCustomers()
     const orders = getOrders()
     const payments = getPayments()
+
+    const userIsAdmin = isAdmin()
 
     const totalSales = orders.reduce((s, o) => s + (o.total || 0), 0)
     const totalCost = orders.reduce((s, o) => {
@@ -45,7 +47,12 @@ export default function Dashboard({ currency, formatCurrency }) {
         <div className="page-enter">
             <div className="page-header">
                 <h1>Dashboard</h1>
-                <p>Overview of your wholesale business at a glance</p>
+                <p>
+                    {userIsAdmin
+                        ? 'Overview of your wholesale business at a glance'
+                        : `Welcome, ${auth?.username || 'Staff'} — here's your quick overview`
+                    }
+                </p>
             </div>
 
             {/* Stat Cards */}
@@ -82,40 +89,45 @@ export default function Dashboard({ currency, formatCurrency }) {
                         <span className="stat-growth up">↑ Revenue</span>
                     </div>
                 </div>
-                <div className="stat-card">
-                    <div className="stat-icon teal">📊</div>
-                    <div className="stat-info">
-                        <h3>{formatCurrency(totalProfit)}</h3>
-                        <p>Net Profit</p>
-                        <span className={`stat-growth ${totalProfit >= 0 ? 'up' : 'down'}`}>
-                            {totalProfit >= 0 ? '↑' : '↓'} {profitMargin}%
-                        </span>
+                {/* Net Profit — admin only */}
+                {userIsAdmin && (
+                    <div className="stat-card">
+                        <div className="stat-icon teal">📊</div>
+                        <div className="stat-info">
+                            <h3>{formatCurrency(totalProfit)}</h3>
+                            <p>Net Profit</p>
+                            <span className={`stat-growth ${totalProfit >= 0 ? 'up' : 'down'}`}>
+                                {totalProfit >= 0 ? '↑' : '↓'} {profitMargin}%
+                            </span>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
-            {/* Profit Summary */}
-            <div className="card">
-                <div className="card-title"><span className="icon">💹</span> Profit Summary</div>
-                <div className="profit-summary-grid">
-                    <div className="profit-metric">
-                        <h4>Total Revenue</h4>
-                        <div className="profit-value">{formatCurrency(totalSales)}</div>
-                    </div>
-                    <div className="profit-metric">
-                        <h4>Total Cost</h4>
-                        <div className="profit-value text-warning">{formatCurrency(totalCost)}</div>
-                    </div>
-                    <div className="profit-metric">
-                        <h4>Net Profit</h4>
-                        <div className="profit-value text-success">{formatCurrency(totalProfit)}</div>
-                    </div>
-                    <div className="profit-metric">
-                        <h4>Profit Margin</h4>
-                        <div className="profit-value text-info">{profitMargin}%</div>
+            {/* Profit Summary — admin only */}
+            {userIsAdmin && (
+                <div className="card">
+                    <div className="card-title"><span className="icon">💹</span> Profit Summary</div>
+                    <div className="profit-summary-grid">
+                        <div className="profit-metric">
+                            <h4>Total Revenue</h4>
+                            <div className="profit-value">{formatCurrency(totalSales)}</div>
+                        </div>
+                        <div className="profit-metric">
+                            <h4>Total Cost</h4>
+                            <div className="profit-value text-warning">{formatCurrency(totalCost)}</div>
+                        </div>
+                        <div className="profit-metric">
+                            <h4>Net Profit</h4>
+                            <div className="profit-value text-success">{formatCurrency(totalProfit)}</div>
+                        </div>
+                        <div className="profit-metric">
+                            <h4>Profit Margin</h4>
+                            <div className="profit-value text-info">{profitMargin}%</div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Quick Info */}
             <div className="quick-info-grid">
@@ -193,13 +205,16 @@ export default function Dashboard({ currency, formatCurrency }) {
                             )}
                         </ul>
                     </div>
-                    <div className="suggestion-box">
-                        <h4>💳 Payment Status</h4>
-                        <ul>
-                            <li>Received: <strong className="text-success">{formatCurrency(totalPaid)}</strong></li>
-                            <li>Pending: <strong className="text-warning">{formatCurrency(pendingAmt)}</strong></li>
-                        </ul>
-                    </div>
+                    {/* Payment Status — admin only */}
+                    {userIsAdmin && (
+                        <div className="suggestion-box">
+                            <h4>💳 Payment Status</h4>
+                            <ul>
+                                <li>Received: <strong className="text-success">{formatCurrency(totalPaid)}</strong></li>
+                                <li>Pending: <strong className="text-warning">{formatCurrency(pendingAmt)}</strong></li>
+                            </ul>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { canAccessPage } from '../store'
 
 const NOTIF_ICONS = {
     order: '🛒',
@@ -25,7 +26,8 @@ export default function DynamicIsland({
     const profileRef = useRef(null)
     const lastScrollY = useRef(0)
 
-    const navItems = [
+    // All nav items — filtered by role
+    const allNavItems = [
         { id: 'dashboard', emoji: '📊', label: 'Dashboard' },
         { id: 'products', emoji: '📦', label: 'Products' },
         { id: 'customers', emoji: '👥', label: 'Customers' },
@@ -35,6 +37,9 @@ export default function DynamicIsland({
         { id: 'payments', emoji: '💳', label: 'Payments' },
         { id: 'delivery', emoji: '🚚', label: 'Delivery' },
     ]
+
+    // Only show nav items that the current user role can access
+    const navItems = allNavItems.filter(item => canAccessPage(item.id))
 
     const unreadCount = notifications.filter(n => !n.read).length
 
@@ -67,6 +72,9 @@ export default function DynamicIsland({
         return () => window.removeEventListener('scroll', handleScroll)
     }, [handleScroll])
 
+    // Only show Settings in profile dropdown if user can access it
+    const canSettings = canAccessPage('settings')
+
     return (
         <nav className={`dynamic-island${hidden ? ' di-hidden' : ''}`}>
             {/* Brand */}
@@ -77,7 +85,7 @@ export default function DynamicIsland({
                 <span className="di-brand-text" style={{ fontWeight: '800', letterSpacing: '0.5px' }}>SupplyNest</span>
             </div>
 
-            {/* Nav Items */}
+            {/* Nav Items — role-filtered */}
             <div className="di-nav">
                 {navItems.map(item => (
                     <button
@@ -164,9 +172,11 @@ export default function DynamicIsland({
                                 <div className="profile-name">{auth?.username || 'User'}</div>
                                 <div className="profile-role">{auth?.role || 'Staff'}</div>
                             </div>
-                            <button className="profile-menu-item" onClick={() => { onNavigate('settings'); setProfileOpen(false) }}>
-                                ⚙️ Settings
-                            </button>
+                            {canSettings && (
+                                <button className="profile-menu-item" onClick={() => { onNavigate('settings'); setProfileOpen(false) }}>
+                                    ⚙️ Settings
+                                </button>
+                            )}
                             <button className="profile-menu-item danger" onClick={onLogout}>
                                 🚪 Logout
                             </button>

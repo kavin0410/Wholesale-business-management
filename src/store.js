@@ -41,10 +41,43 @@ export function formatCurrency(amountINR, currency) {
     return sym + converted.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-/* Auth */
+/* Auth — enhanced with RBAC */
 const USERS = {
     admin: { password: 'admin123', role: 'admin' },
     staff: { password: 'staff123', role: 'staff' },
+}
+
+// Permission definitions (mirrors backend auth_middleware.py)
+const ROLE_PERMISSIONS = {
+    admin: new Set([
+        'products:view', 'products:create', 'products:edit', 'products:delete',
+        'suppliers:view', 'suppliers:create', 'suppliers:edit', 'suppliers:delete',
+        'customers:view', 'customers:create', 'customers:edit', 'customers:delete',
+        'orders:view', 'orders:create', 'orders:edit', 'orders:delete',
+        'payments:view', 'payments:create',
+        'reports:view', 'dashboard:view',
+        'delivery:view', 'delivery:edit',
+        'settings:view', 'settings:edit',
+        'users:manage',
+        'export:data',
+        'ai:view',
+    ]),
+    staff: new Set([
+        'products:view',
+        'suppliers:view',
+        'customers:view',
+        'orders:view', 'orders:create',
+        'payments:view',
+        'dashboard:view',
+        'delivery:view', 'delivery:edit',
+        'ai:view',
+    ]),
+}
+
+// Pages that each role can access
+const ROLE_PAGES = {
+    admin: ['dashboard', 'products', 'customers', 'suppliers', 'orders', 'reports', 'payments', 'delivery', 'settings'],
+    staff:  ['dashboard', 'products', 'customers', 'orders', 'delivery'],
 }
 
 export function getAuth() {
@@ -55,13 +88,59 @@ export function getAuth() {
 export function login(username, password) {
     const u = USERS[username.toLowerCase()]
     if (!u || u.password !== password) return null
-    const auth = { username: username.toLowerCase(), role: u.role }
+    const role = u.role
+    const permissions = Array.from(ROLE_PERMISSIONS[role] || [])
+    const allowedPages = ROLE_PAGES[role] || []
+    const auth = { username: username.toLowerCase(), role, permissions, allowedPages }
     localStorage.setItem(STORE_KEYS.auth, JSON.stringify(auth))
     return auth
 }
 
 export function logout() {
     localStorage.removeItem(STORE_KEYS.auth)
+}
+
+/**
+ * Check if the current user has a specific permission.
+ * @param {string} permission — e.g. 'products:delete'
+ * @returns {boolean}
+ */
+export function hasPermission(permission) {
+    const auth = getAuth()
+    if (!auth) return false
+    const perms = ROLE_PERMISSIONS[auth.role]
+    return perms ? perms.has(permission) : false
+}
+
+/**
+ * Check if the current user can access a specific page.
+ * @param {string} page — e.g. 'reports'
+ * @returns {boolean}
+ */
+export function canAccessPage(page) {
+    const auth = getAuth()
+    if (!auth) return false
+    const pages = ROLE_PAGES[auth.role]
+    return pages ? pages.includes(page) : false
+}
+
+/**
+ * Check if the current user has admin role.
+ * @returns {boolean}
+ */
+export function isAdmin() {
+    const auth = getAuth()
+    return auth?.role === 'admin'
+}
+
+/**
+ * Get the list of allowed nav pages for the current user.
+ * @returns {string[]}
+ */
+export function getAllowedPages() {
+    const auth = getAuth()
+    if (!auth) return []
+    return ROLE_PAGES[auth.role] || []
 }
 
 /* Notifications */
@@ -158,4 +237,4 @@ export function importBackup(file) {
     })
 }
 
-export { STORE_KEYS }
+export { STORE_KEYS, ROLE_PERMISSIONS, ROLE_PAGES }

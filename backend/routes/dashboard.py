@@ -1,13 +1,16 @@
-"""Dashboard stats route."""
-from fastapi import APIRouter
+"""Dashboard stats route + RBAC."""
+from fastapi import APIRouter, Depends
 from database import get_db
 from models import ApiResponse
+from auth_middleware import require_permission
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 @router.get("/stats", response_model=ApiResponse)
-def dashboard_stats():
+def dashboard_stats(
+    user: dict = Depends(require_permission("dashboard:view")),
+):
     conn = get_db()
     products = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
     customers = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
@@ -34,6 +37,19 @@ def dashboard_stats():
 
     conn.close()
     profit = total_sales - total_cost
+
+    # Staff gets a limited view — hide sensitive financial details
+    if user["role"] == "staff":
+        return ApiResponse(data={
+            "total_products": products,
+            "total_customers": customers,
+            "total_orders": orders,
+            "total_sales": total_sales,
+            "low_stock": [dict(r) for r in low_stock],
+            "recent_orders": [dict(r) for r in recent],
+        })
+
+    # Admin gets full view
     return ApiResponse(data={
         "total_products": products,
         "total_customers": customers,
