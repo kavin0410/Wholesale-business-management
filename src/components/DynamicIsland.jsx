@@ -79,10 +79,8 @@ export default function DynamicIsland({
         <nav className={`dynamic-island${hidden ? ' di-hidden' : ''}`}>
             {/* Brand */}
             <div className="di-brand" onClick={() => onNavigate('dashboard')}>
-                <div className="di-brand-logo">
-                    <img src="/assets/logo.png" alt="SupplyNest" style={{ height: '32px', borderRadius: '6px' }} />
-                </div>
-                <span className="di-brand-text" style={{ fontWeight: '800', letterSpacing: '0.5px' }}>SupplyNest</span>
+                <div className="di-brand-logo" role="img" aria-label="SupplyNest Logo" />
+                <span className="di-brand-text">SupplyNest</span>
             </div>
 
             {/* Nav Items — role-filtered */}

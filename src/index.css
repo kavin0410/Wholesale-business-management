@@ -133,34 +133,49 @@ button {
 .di-brand {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 10px 5px 8px;
+    gap: 8px;
+    padding: 4px 12px 4px 4px;
     margin-right: 2px;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     cursor: pointer;
     flex-shrink: 0;
+    transition: all var(--transition);
 }
 
-.di-brand-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, var(--primary), #8b5cf6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 13px;
-    font-weight: 800;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+.di-brand:hover {
+    border-right-color: rgba(200, 160, 80, 0.15);
+}
+
+/* Navbar logo — embedded as background, blends with dark navbar */
+.di-brand-logo {
+    width: 38px;
+    height: 38px;
     flex-shrink: 0;
+    background: url('/assets/logo.png') center / contain no-repeat;
+    border-radius: 8px;
+    position: relative;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.3s ease;
+}
+
+/* Subtle warm glow on hover */
+.di-brand:hover .di-brand-logo {
+    transform: scale(1.08);
+    box-shadow: 0 0 14px rgba(200, 160, 80, 0.25),
+                0 0 4px rgba(200, 160, 80, 0.15);
 }
 
 .di-brand-text {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 800;
     color: #fff;
     white-space: nowrap;
+    letter-spacing: 0.5px;
+    background: linear-gradient(135deg, #fff 30%, var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    transition: opacity var(--transition);
 }
 
 .di-nav {
@@ -516,22 +531,60 @@ button {
 
 .login-brand {
     text-align: center;
-    margin-bottom: 40px;
+    margin-bottom: 36px;
 }
 
-.brand-icon-lg {
-    width: 76px;
-    height: 76px;
-    border-radius: 20px;
-    background: linear-gradient(135deg, var(--primary), #8b5cf6);
-    display: inline-flex;
+/* Login logo — embedded as background with decorative glow ring */
+.login-logo-container {
+    position: relative;
+    display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    font-size: 26px;
-    font-weight: 800;
-    margin-bottom: 18px;
-    box-shadow: 0 8px 32px rgba(99, 102, 241, 0.4);
+    width: 110px;
+    height: 110px;
+    margin: 0 auto 20px;
+}
+
+/* Radial glow behind logo */
+.login-logo-glow {
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(200, 160, 80, 0.18) 0%, transparent 70%);
+    border: 1.5px solid rgba(200, 160, 80, 0.12);
+    animation: logoPulse 3s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes logoPulse {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.06); opacity: 1; }
+}
+
+/* Logo mark — background-image blends with the dark card */
+.login-logo-mark {
+    width: 100%;
+    height: 100%;
+    background: url('/assets/logo.png') center / 75% no-repeat;
+    background-color: #110e0a;
+    border-radius: 22px;
+    position: relative;
+    z-index: 1;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.4s ease;
+}
+
+.login-logo-container:hover .login-logo-mark {
+    transform: scale(1.05);
+    box-shadow: 0 0 24px rgba(200, 160, 80, 0.2),
+                0 0 8px rgba(200, 160, 80, 0.1);
+}
+
+.login-logo-container:hover .login-logo-glow {
+    animation-play-state: paused;
+    transform: scale(1.1);
+    opacity: 1;
+    border-color: rgba(200, 160, 80, 0.22);
 }
 
 .login-brand h1 {
@@ -1629,5 +1682,44 @@ tbody tr:hover {
 
     .timeline-connector {
         display: none;
+    }
+
+    /* Logo responsive sizing */
+    .di-brand-logo {
+        width: 32px;
+        height: 32px;
+    }
+
+    .di-brand-text {
+        font-size: 12px;
+    }
+
+    .login-logo-container {
+        width: 90px;
+        height: 90px;
+    }
+
+    .login-brand h1 {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .di-brand-text {
+        display: none;
+    }
+
+    .di-brand-logo {
+        width: 30px;
+        height: 30px;
+    }
+
+    .login-logo-container {
+        width: 76px;
+        height: 76px;
+    }
+
+    .login-card {
+        padding: 36px 24px;
     }
 }

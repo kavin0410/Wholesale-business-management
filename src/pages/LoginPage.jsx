@@ -16,7 +16,10 @@ export default function LoginPage({ onLogin }) {
         <div className="login-page">
             <div className="login-card">
                 <div className="login-brand">
-                    <div className="brand-icon-lg">SN</div>
+                    <div className="login-logo-container">
+                        <div className="login-logo-glow" />
+                        <div className="login-logo-mark" role="img" aria-label="SupplyNest Logo" />
+                    </div>
                     <h1>
                         SupplyNest
                         <span>Wholesale Business Management</span>
