@@ -148,34 +148,26 @@ button {
 
 /* Navbar logo — embedded as background, blends with dark navbar */
 .di-brand-logo {
-    width: 38px;
-    height: 38px;
+    width: 42px;
+    height: 42px;
     flex-shrink: 0;
     background: url('/assets/logo.png') center / contain no-repeat;
     border-radius: 8px;
     position: relative;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                box-shadow 0.3s ease;
-}
-
-/* Subtle warm glow on hover */
-.di-brand:hover .di-brand-logo {
-    transform: scale(1.08);
-    box-shadow: 0 0 14px rgba(200, 160, 80, 0.25),
-                0 0 4px rgba(200, 160, 80, 0.15);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .di-brand-text {
-    font-size: 14px;
+    font-size: 20px;
     font-weight: 800;
     color: #fff;
     white-space: nowrap;
-    letter-spacing: 0.5px;
-    background: linear-gradient(135deg, #fff 30%, var(--accent));
+    letter-spacing: 0.8px;
+    background: linear-gradient(135deg, #ffffff 40%, #c8a050 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    transition: opacity var(--transition);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
 .di-nav {
@@ -565,13 +557,14 @@ button {
 .login-logo-mark {
     width: 100%;
     height: 100%;
-    background: url('/assets/logo.png') center / 75% no-repeat;
-    background-color: #110e0a;
-    border-radius: 22px;
+    background: url('/assets/logo.png') center / 85% no-repeat;
+    background-color: #ffffff;
+    border-radius: 20px;
     position: relative;
     z-index: 1;
     transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
                 box-shadow 0.4s ease;
+    border: 2px solid rgba(200, 160, 80, 0.3);
 }
 
 .login-logo-container:hover .login-logo-mark {

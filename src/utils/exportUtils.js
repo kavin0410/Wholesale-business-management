@@ -1,84 +1,196 @@
-/**
- * Utility functions for exporting data to PDF and Excel.
- */
+// Helper to load image as base64
+async function getBase64ImageFromUrl(imageUrl) {
+    try {
+        const res = await fetch(imageUrl);
+        const blob = await res.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('Failed to load image'));
+            reader.readAsDataURL(blob);
+        });
+    } catch (err) {
+        return null;
+    }
+}
 
 // Generate Invoice PDF
-export function generateInvoice(order, customer, product, businessInfo = {}) {
-    const { jsPDF } = window.jspdf;
+export async function generateInvoice(order, customer, product) {
+    const jsPDF = window.jspdf.jsPDF;
     const doc = new jsPDF();
     
-    const logoBase64 = businessInfo.logo || ''; // Base64 logo
+    // Load Logo
+    const logoBase64 = await getBase64ImageFromUrl('/assets/logo.png');
     
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(40);
-    doc.text(businessInfo.name || 'SUPPLYNEST', 105, 20, { align: 'center' });
+    const primaryColor = [96, 142, 132]; // Teal/Sage from template image
+    const secondaryColor = [100, 100, 100];
+    
+    // --- 1. Top Header Section ---
+    // Left: Company Info
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    doc.text('SupplyNest', 20, 20);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text('No.57, Shanthi Nagar, Madhavaram', 20, 26);
+    doc.text('Chennai - 600060', 20, 31);
+    doc.text('8925136089', 20, 36);
+    doc.text('supplynest@gmail.com', 20, 41);
+    doc.text('www.supplynest.com', 20, 46);
+    
+    // Right: Logo
+    if (logoBase64) {
+        // Logo in a box like the template
+        doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.setLineWidth(0.1);
+        doc.rect(140, 15, 50, 25);
+        doc.addImage(logoBase64, 'PNG', 152, 17, 25, 21);
+    }
+    
+    // --- 2. Title Section ---
+    doc.setFontSize(36);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('INVOICE', 190, 65, { align: 'right' });
+    
+    // --- 3. Billing & Invoice Info ---
+    // Left: Bill To
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('Bill To', 20, 80);
+    
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    doc.text(customer?.name || 'Walk-in Customer', 20, 88);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(customer?.address || 'Customer Address Not Provided', 20, 93);
+    doc.text(customer?.phone || '', 20, 98);
+    
+    // Right: Invoice Metadata
+    const metaX = 140;
+    const valueX = 190;
     
     doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(businessInfo.address || '123 Business Road, Wholesale City', 105, 27, { align: 'center' });
-    doc.text(`Contact: ${businessInfo.phone || '+91 9876543210'} | Email: ${businessInfo.email || 'contact@supplynest.com'}`, 105, 33, { align: 'center' });
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     
-    doc.setDrawColor(200);
-    doc.line(20, 40, 190, 40);
+    doc.text('Invoice #', metaX, 80);
+    doc.text('Invoice date', metaX, 88);
+    doc.text('Payment mode', metaX, 96);
     
-    // Invoice Info
-    doc.setFontSize(16);
-    doc.setTextColor(0);
-    doc.text('PAYMENT INVOICE', 20, 50);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(40, 40, 40);
+    doc.text(order.id.toString().padStart(7, '0'), valueX, 80, { align: 'right' });
+    doc.text(order.date, valueX, 88, { align: 'right' });
+    doc.text(order.paymentMethod || 'Cash', valueX, 96, { align: 'right' });
     
-    doc.setFontSize(10);
-    doc.text(`Order ID: #${order.id}`, 20, 60);
-    doc.text(`Date: ${order.date}`, 20, 65);
-    doc.text(`Payment Mode: ${order.paymentMethod || 'Cash'}`, 20, 70);
-    
-    // Customer Info
-    doc.setFontSize(12);
-    doc.text('Bill To:', 140, 50);
-    doc.setFontSize(10);
-    doc.text(customer?.name || 'Walk-in Customer', 140, 55);
-    doc.text(customer?.phone || '', 140, 60);
-    doc.text(customer?.email || '', 140, 65);
-    
-    // Table
+    // --- 4. Items Table ---
     const tableData = [
         [
-            product?.name || 'Product',
+            '1.00',
+            product?.name || 'General Product',
             order.quantity.toString(),
             `₹${product?.price?.toLocaleString() || 0}`,
-            `${order.discount}%`,
             `₹${order.total?.toLocaleString() || 0}`
         ]
     ];
     
     doc.autoTable({
-        startY: 80,
-        head: [['Product Details', 'Qty', 'Unit Price', 'Discount', 'Total']],
-        body: tableData,
-        theme: 'striped',
-        headStyles: { fillColor: [63, 81, 181] },
-        styles: { fontSize: 10 }
+        startY: 110,
+        head: [['QTY', 'Description', 'Unit Price', 'Discount', 'Amount']],
+        body: [
+            [
+                order.quantity.toFixed(2),
+                product?.name || 'Product',
+                product?.price?.toFixed(2) || '0.00',
+                `${order.discount}%`,
+                `₹${order.total?.toLocaleString() || 0}`
+            ]
+        ],
+        theme: 'plain',
+        headStyles: { 
+            fillColor: primaryColor,
+            textColor: [255, 255, 255],
+            fontStyle: 'bold'
+        },
+        styles: { 
+            fontSize: 10, 
+            cellPadding: 4,
+            lineColor: [240, 240, 240],
+            lineWidth: 0.1
+        },
+        columnStyles: {
+            0: { cellWidth: 20 },
+            2: { cellWidth: 30, halign: 'right' },
+            3: { cellWidth: 30, halign: 'right' },
+            4: { cellWidth: 35, halign: 'right' }
+        }
     });
     
-    const finalY = doc.lastAutoTable.finalY + 10;
+    let currentY = doc.lastAutoTable.finalY + 10;
     
-    // Summary
-    doc.setFontSize(12);
-    doc.setTextColor(0);
-    doc.text(`Total Amount: ₹${order.total?.toLocaleString() || 0}`, 190, finalY + 10, { align: 'right' });
+    // --- 5. Calculation Summary ---
+    const summaryX = 140;
+    const summaryValX = 190;
     
     doc.setFontSize(10);
-    doc.setTextColor(120);
-    doc.text('Thank you for your business!', 105, finalY + 30, { align: 'center' });
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    
+    doc.text('Subtotal', summaryX, currentY);
+    doc.text(`₹${(product?.price * order.quantity).toLocaleString()}`, summaryValX, currentY, { align: 'right' });
+    
+    currentY += 8;
+    doc.text(`Discount (${order.discount}%)`, summaryX, currentY);
+    doc.text(`-₹${(order.discountAmt || 0).toLocaleString()}`, summaryValX, currentY, { align: 'right' });
+    
+    currentY += 10;
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.5);
+    doc.line(summaryX, currentY - 5, summaryValX, currentY - 5);
+    
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFontSize(12);
+    doc.text('Total (INR)', summaryX, currentY);
+    doc.text(`₹${order.total?.toLocaleString()}`, summaryValX, currentY, { align: 'right' });
+    
+    // Bottom border for total like in template
+    doc.setLineWidth(1);
+    doc.line(summaryX, currentY + 2, summaryValX, currentY + 2);
+    
+    // --- 6. Footer section (Terms & Conditions) ---
+    const footerY = doc.internal.pageSize.height - 40;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('Terms and Conditions', 20, footerY);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text('Payment is due in 30 days.', 20, footerY + 6);
+    doc.text('Please contact us for any discrepancy in the invoice.', 20, footerY + 11);
     
     doc.save(`Invoice_Order_${order.id}.pdf`);
 }
 
 // Export to Excel
 export function exportToExcel(data, fileName) {
-    const { utils, writeFile } = window.XLSX;
-    const ws = utils.json_to_sheet(data);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, "Data");
-    writeFile(wb, `${fileName}.xlsx`);
+    try {
+        const { utils, writeFile } = window.XLSX;
+        const ws = utils.json_to_sheet(data);
+        const wb = utils.book_new();
+        utils.book_append_sheet(wb, ws, "Data");
+        writeFile(wb, `${fileName}.xlsx`);
+    } catch (err) {
+        console.error("Excel export failed:", err);
+    }
 }
