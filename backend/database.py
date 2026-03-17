@@ -70,6 +70,8 @@ def init_db():
         total       REAL NOT NULL,
         profit      REAL DEFAULT 0,
         status      TEXT NOT NULL DEFAULT 'Pending',
+        payment_method TEXT DEFAULT 'Cash',
+        razorpay_id  TEXT,
         date        TEXT NOT NULL,
         FOREIGN KEY (customer_id) REFERENCES customers(id),
         FOREIGN KEY (product_id) REFERENCES products(id)

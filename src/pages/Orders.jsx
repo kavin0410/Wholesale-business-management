@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react'
-import { getOrders, saveOrders, getProducts, saveProducts, getCustomers, nextId, addNotification } from '../store'
+import { getOrders, saveOrders, getProducts, saveProducts, getCustomers, nextId, addNotification, savePayments, getPayments } from '../store'
+import { generateInvoice } from '../utils/exportUtils'
 
 export default function Orders({ showToast, formatCurrency, refresh }) {
     const [orders, setOrders] = useState(getOrders())
     const products = getProducts()
     const customers = getCustomers()
-    const [form, setForm] = useState({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false })
+    const [form, setForm] = useState({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
 
     const reload = () => { setOrders(getOrders()); refresh() }
 
@@ -22,6 +23,56 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
         const total = subtotal - discountAmt
         return { subtotal, discountAmt, total, discountPct }
     }, [form, products])
+
+    const handleRazorpay = (orderData, prod, cust) => {
+        const options = {
+            key: "rzp_test_dummykey", // In production, move to env
+            amount: Math.round(orderData.total * 100),
+            currency: "INR",
+            name: "SupplyNest Wholesale",
+            description: `Order #${orderData.id}`,
+            handler: function (response) {
+                // Payment success
+                const orders = getOrders()
+                orderData.razorpayId = response.razorpay_payment_id
+                orderData.status = 'Paid'
+                orders.push(orderData)
+                saveOrders(orders)
+
+                // Record payment
+                const payments = getPayments()
+                payments.push({
+                    id: Date.now(),
+                    orderId: orderData.id,
+                    customerId: cust.id,
+                    amount: orderData.total,
+                    method: orderData.paymentMethod,
+                    date: new Date().toLocaleDateString(),
+                    transactionId: response.razorpay_payment_id
+                })
+                savePayments(payments)
+
+                // Update stock
+                const allProds = getProducts()
+                const pi = allProds.findIndex(p => p.id === prod.id)
+                if (pi >= 0) { allProds[pi].stock -= orderData.quantity; saveProducts(allProds) }
+
+                showToast('Payment Successful! Order Placed.', 'success')
+                addNotification(`Order #${orderData.id} Paid via Razorpay`, 'order')
+                generateInvoice(orderData, cust, prod)
+                setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
+                reload()
+            },
+            prefill: {
+                name: cust.name,
+                email: cust.email,
+                contact: cust.phone
+            },
+            theme: { color: "#3f51b5" }
+        }
+        const rzp = new window.Razorpay(options)
+        rzp.open()
+    }
 
     const handleSubmit = (e) => {
         e.preventDefault()
@@ -42,10 +93,30 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
             total: calcResult.total,
             profit: (prod.price - prod.costPrice) * qty - calcResult.discountAmt,
             status: 'Pending',
+            paymentMethod: form.paymentMethod,
             date: new Date().toLocaleDateString(),
         }
+
+        if (['UPI', 'QR Code', 'Debit Card', 'Credit Card'].includes(form.paymentMethod)) {
+            handleRazorpay(order, prod, cust)
+            return
+        }
+
+        // Cash payment
         data.push(order)
         saveOrders(data)
+
+        // Record payment for cash too (as partial or full)
+        const payments = getPayments()
+        payments.push({
+            id: Date.now(),
+            orderId: order.id,
+            customerId: cust.id,
+            amount: order.total,
+            method: 'Cash',
+            date: new Date().toLocaleDateString()
+        })
+        savePayments(payments)
 
         // Update stock
         const allProds = getProducts()
@@ -54,7 +125,11 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
 
         showToast('Order placed successfully!', 'success')
         addNotification(`Order #${order.id}: ${cust.name} ordered ${prod.name} ×${qty}`, 'order')
-        setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false })
+        
+        // Auto generate PDF for Cash too
+        generateInvoice(order, cust, prod)
+        
+        setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
         reload()
     }
 
@@ -105,6 +180,16 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
                             <input type="number" placeholder="0" min="0" max="100" value={form.discount} onChange={e => setForm({ ...form, discount: e.target.value })} />
                         </div>
                         <div className="form-group">
+                            <label>Payment Method</label>
+                            <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} required>
+                                <option value="Cash">Cash</option>
+                                <option value="UPI">UPI</option>
+                                <option value="QR Code">QR Code</option>
+                                <option value="Debit Card">Debit Card</option>
+                                <option value="Credit Card">Credit Card</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
                             <label>
                                 <input type="checkbox" checked={form.seasonal} onChange={e => setForm({ ...form, seasonal: e.target.checked })} />
                                 Apply Seasonal Offer (10% extra)
@@ -123,7 +208,9 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
                             <input type="text" value={calcResult.total ? formatCurrency(calcResult.total) : '—'} readOnly style={{ fontWeight: 700, fontSize: 16 }} />
                         </div>
                     </div>
-                    <button type="submit" className="btn btn-primary">🛒 Place Order</button>
+                    <button type="submit" className="btn btn-primary">
+                        {['Cash'].includes(form.paymentMethod) ? '🛒 Place Order' : '💳 Proceed to Pay'}
+                    </button>
                 </form>
             </div>
 
@@ -154,9 +241,10 @@ export default function Orders({ showToast, formatCurrency, refresh }) {
                                         <td><span className={`status-badge ${statusClass}`}>{o.status}</span></td>
                                         <td>
                                             <div className="btn-group">
-                                                {o.status === 'Pending' && <button className="btn btn-success btn-sm" onClick={() => handleStatus(o.id, 'Delivered')}>✅</button>}
-                                                {o.status === 'Pending' && <button className="btn btn-danger btn-sm" onClick={() => handleStatus(o.id, 'Cancelled')}>❌</button>}
-                                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(o.id)}>🗑️</button>
+                                                 <button className="btn btn-info btn-sm" title="Download Invoice" onClick={() => generateInvoice(o, cust, prod)}>📄</button>
+                                                 {o.status === 'Pending' && <button className="btn btn-success btn-sm" onClick={() => handleStatus(o.id, 'Delivered')}>✅</button>}
+                                                 {o.status === 'Pending' && <button className="btn btn-danger btn-sm" onClick={() => handleStatus(o.id, 'Cancelled')}>❌</button>}
+                                                 <button className="btn btn-danger btn-sm" onClick={() => handleDelete(o.id)}>🗑️</button>
                                             </div>
                                         </td>
                                     </tr>

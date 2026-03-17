@@ -55,9 +55,9 @@ def create_order(body: OrderCreate):
     now = datetime.now().strftime("%Y-%m-%d")
 
     cur = conn.execute(
-        """INSERT INTO orders (customer_id,product_id,quantity,discount,discount_amt,total,profit,status,date)
-           VALUES (?,?,?,?,?,?,?,?,?)""",
-        (body.customer_id, body.product_id, body.quantity, discount_pct, discount_amt, total, profit, "Pending", now)
+        """INSERT INTO orders (customer_id,product_id,quantity,discount,discount_amt,total,profit,status,payment_method,date)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (body.customer_id, body.product_id, body.quantity, discount_pct, discount_amt, total, profit, "Pending", body.payment_method, now)
     )
     order_id = cur.lastrowid
 

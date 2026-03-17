@@ -80,6 +80,7 @@ class OrderCreate(BaseModel):
     quantity: int = Field(gt=0)
     discount: float = 0
     seasonal: bool = False
+    payment_method: str = "Cash"
 
 class OrderOut(BaseModel):
     id: int
@@ -94,6 +95,8 @@ class OrderOut(BaseModel):
     date: str
     customer_name: Optional[str] = None
     product_name: Optional[str] = None
+    payment_method: Optional[str] = "Cash"
+    razorpay_id: Optional[str] = None
 
 
 # ── Payments ─────────────────────────────────────────

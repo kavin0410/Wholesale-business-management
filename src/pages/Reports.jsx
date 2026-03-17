@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo } from 'react'
 import { getProducts, getOrders, getCustomers } from '../store'
+import { exportToExcel } from '../utils/exportUtils'
 import { Chart, registerables } from 'chart.js'
 
 Chart.register(...registerables)
@@ -202,6 +203,22 @@ export default function Reports({ formatCurrency }) {
             <div className="card chart-card" style={{ maxWidth: 560 }}>
                 <div className="card-title"><span className="icon">🥧</span> Category-wise Sales</div>
                 <div className="chart-container chart-container-pie"><canvas ref={catRef}></canvas></div>
+            </div>
+
+            <div className="card">
+                <div className="card-title"><span className="icon">💾</span> Data Backup & Export</div>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>Download your business data in Excel (.xlsx) format for backup or external analysis.</p>
+                <div className="btn-group">
+                    <button className="btn btn-success" onClick={() => exportToExcel(orders, 'Orders_Backup')}>
+                        📊 Export Orders
+                    </button>
+                    <button className="btn btn-primary" onClick={() => exportToExcel(customers, 'Customers_Backup')}>
+                        👥 Export Customers
+                    </button>
+                    <button className="btn btn-warning" onClick={() => exportToExcel(products, 'Inventory_Backup')}>
+                        📦 Export Inventory
+                    </button>
+                </div>
             </div>
         </div>
     )
