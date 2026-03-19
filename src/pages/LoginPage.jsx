@@ -5,11 +5,21 @@ export default function LoginPage({ onLogin }) {
     const [password, setPassword] = useState('')
     const [error, setError] = useState('')
 
-    const handleSubmit = (e) => {
+    const [loading, setLoading] = useState(false)
+ 
+    const handleSubmit = async (e) => {
         e.preventDefault()
+        if (loading) return
         setError('')
-        const result = onLogin(username, password)
-        if (!result) setError('Invalid username or password')
+        setLoading(true)
+        try {
+            const result = await onLogin(username, password)
+            if (!result) setError('Invalid username or password')
+        } catch (err) {
+            setError(err.message || 'Login failed')
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (
@@ -59,9 +69,10 @@ export default function LoginPage({ onLogin }) {
                     <button
                         type="submit"
                         className="btn btn-primary"
-                        style={{ width: '100%', justifyContent: 'center', padding: 14, fontSize: 16 }}
+                        style={{ width: '100%', justifyContent: 'center', padding: 14, fontSize: 16, opacity: loading ? 0.7 : 1 }}
+                        disabled={loading}
                     >
-                        🔐 Sign In
+                        {loading ? '⏳ Authenticating...' : '🔐 Sign In'}
                     </button>
 
                     <div className="login-hint">

@@ -1,9 +1,18 @@
-import { useState } from 'react'
-import { getProducts, saveProducts, getSuppliers, nextId, addNotification, hasPermission } from '../store'
+import { useState, useEffect } from 'react'
+import {
+    fetchProducts,
+    createProduct,
+    updateProductApi,
+    deleteProductApi,
+    getSuppliers,
+    addNotification,
+    hasPermission
+} from '../store'
 
-export default function Products({ showToast, formatCurrency, refresh, auth }) {
-    const [products, setProducts] = useState(getProducts())
-    const suppliers = getSuppliers()
+export default function Products({ showToast, formatCurrency, refresh: refreshApp, auth }) {
+    const [products, setProducts] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [suppliers, setSuppliers] = useState(getSuppliers())
     const [editId, setEditId] = useState(null)
     const [form, setForm] = useState({ name: '', category: '', costPrice: '', price: '', stock: '', supplierId: '' })
 
@@ -14,55 +23,105 @@ export default function Products({ showToast, formatCurrency, refresh, auth }) {
     const canEdit = hasPermission('products:edit')
     const canDelete = hasPermission('products:delete')
 
+    useEffect(() => {
+        loadData()
+    }, [])
+
+    const loadData = async () => {
+        setLoading(true)
+        try {
+            const { data } = await fetchProducts()
+            setProducts(data)
+        } catch (err) {
+            showToast('Failed to load products', 'error')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const resetForm = () => {
         setForm({ name: '', category: '', costPrice: '', price: '', stock: '', supplierId: '' })
         setEditId(null)
     }
 
-    const reload = () => { setProducts(getProducts()); refresh() }
+    const reload = () => { loadData(); refreshApp() }
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
         if (editId && !canEdit) return showToast('⛔ You do not have permission to edit products', 'error')
         if (!editId && !canCreate) return showToast('⛔ You do not have permission to add products', 'error')
 
-        const data = getProducts()
-        const supplierName = suppliers.find(s => s.id === Number(form.supplierId))?.name || ''
-        if (editId) {
-            const idx = data.findIndex(p => p.id === editId)
-            if (idx >= 0) {
-                data[idx] = { ...data[idx], name: form.name, category: form.category, costPrice: Number(form.costPrice), price: Number(form.price), stock: Number(form.stock), supplierId: Number(form.supplierId), supplierName }
-                saveProducts(data)
-                showToast('Product updated successfully', 'success')
-                addNotification(`Product "${form.name}" updated`, 'info')
+        setLoading(true)
+        try {
+            // Map to backend snake_case
+            const payload = {
+                name: form.name,
+                category: form.category,
+                cost_price: Number(form.costPrice),
+                price: Number(form.price),
+                stock: Number(form.stock),
+                supplier_id: form.supplierId ? Number(form.supplierId) : null
             }
-        } else {
-            const newProd = {
-                id: nextId(data), name: form.name, category: form.category, costPrice: Number(form.costPrice),
-                price: Number(form.price), stock: Number(form.stock), supplierId: Number(form.supplierId), supplierName
+
+            let success = false
+            if (editId) {
+                success = await updateProductApi(editId, payload)
+                if (success) {
+                    showToast('Product updated successfully', 'success')
+                    addNotification(`Product "${form.name}" updated`, 'info')
+                }
+            } else {
+                success = await createProduct(payload)
+                if (success) {
+                    showToast('Product added successfully', 'success')
+                    addNotification(`New product "${form.name}" added`, 'stock')
+                }
             }
-            data.push(newProd)
-            saveProducts(data)
-            showToast('Product added successfully', 'success')
-            addNotification(`New product "${form.name}" added`, 'stock')
+
+            if (success) {
+                resetForm()
+                reload()
+            } else {
+                showToast('Failed to save product', 'error')
+            }
+        } catch (err) {
+            showToast('Error saving product', 'error')
+        } finally {
+            setLoading(false)
         }
-        resetForm()
-        reload()
     }
 
     const handleEdit = (p) => {
         if (!canEdit) return showToast('⛔ You do not have permission to edit products', 'error')
         setEditId(p.id)
-        setForm({ name: p.name, category: p.category, costPrice: String(p.costPrice), price: String(p.price), stock: String(p.stock), supplierId: String(p.supplierId || '') })
+        setForm({
+            name: p.name,
+            category: p.category,
+            costPrice: String(p.costPrice || p.cost_price || ''),
+            price: String(p.price || ''),
+            stock: String(p.stock || ''),
+            supplierId: String(p.supplierId || p.supplier_id || '')
+        })
     }
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (!canDelete) return showToast('⛔ You do not have permission to delete products', 'error')
         if (!confirm('Delete this product?')) return
-        const data = getProducts().filter(p => p.id !== id)
-        saveProducts(data)
-        showToast('Product deleted', 'error')
-        reload()
+
+        setLoading(true)
+        try {
+            const success = await deleteProductApi(id)
+            if (success) {
+                showToast('Product deleted', 'error')
+                reload()
+            } else {
+                showToast('Failed to delete product', 'error')
+            }
+        } catch (err) {
+            showToast('Error deleting product', 'error')
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (
@@ -112,11 +171,11 @@ export default function Products({ showToast, formatCurrency, refresh, auth }) {
                             </div>
                         </div>
                         <div className="btn-group">
-                            <button type="submit" className="btn btn-primary">
-                                {editId ? '💾 Update Product' : '➕ Add Product'}
+                            <button type="submit" className="btn btn-primary" disabled={loading}>
+                                {loading ? '⏳ Processing...' : (editId ? '💾 Update Product' : '➕ Add Product')}
                             </button>
                             {editId && (
-                                <button type="button" className="btn btn-danger" onClick={resetForm}>✖ Cancel</button>
+                                <button type="button" className="btn btn-danger" onClick={resetForm} disabled={loading}>✖ Cancel</button>
                             )}
                         </div>
                     </form>
@@ -124,7 +183,13 @@ export default function Products({ showToast, formatCurrency, refresh, auth }) {
             )}
 
             {/* Table */}
-            <div className="card">
+            <div className="card" style={{ position: 'relative' }}>
+                {loading && !products.length && (
+                    <div className="loading-overlay">
+                        <div className="spinner"></div>
+                        <p>Loading products...</p>
+                    </div>
+                )}
                 <div className="card-title"><span className="icon">📋</span> Product List</div>
                 <div className="table-wrapper">
                     <table>

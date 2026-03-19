@@ -39,8 +39,8 @@ export default function App() {
         setNotifications(getNotifications())
     }, [])
 
-    const handleLogin = (username, password) => {
-        const result = loginFn(username, password)
+    const handleLogin = async (username, password) => {
+        const result = await loginFn(username, password)
         if (result) {
             setAuth(result)
             showToast(`Welcome back, ${result.username}!`, 'success')

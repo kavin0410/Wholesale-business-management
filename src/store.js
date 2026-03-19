@@ -1,4 +1,5 @@
 /* Storage keys */
+import { api } from './utils/api'
 const STORE_KEYS = {
     products: 'wbms_products',
     suppliers: 'wbms_suppliers',
@@ -41,10 +42,9 @@ export function formatCurrency(amountINR, currency) {
     return sym + converted.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-/* Auth — enhanced with RBAC */
-const USERS = {
-    admin: { password: 'admin123', role: 'admin' },
-    staff: { password: 'staff123', role: 'staff' },
+export function getAuth() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEYS.auth)) }
+    catch { return null }
 }
 
 // Permission definitions (mirrors backend auth_middleware.py)
@@ -80,21 +80,32 @@ const ROLE_PAGES = {
     staff:  ['dashboard', 'products', 'customers', 'orders', 'delivery'],
 }
 
-export function getAuth() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEYS.auth)) }
-    catch { return null }
+
+
+export async function login(username, password) {
+    try {
+        const result = await api.post('/auth/login', { username, password })
+        if (!result.success) return null
+
+        const { id, role, permissions } = result.data
+        const allowedPages = ROLE_PAGES[role] || []
+        
+        const auth = { 
+            id,
+            username: username.toLowerCase(), 
+            role, 
+            permissions, 
+            allowedPages 
+        }
+        
+        localStorage.setItem(STORE_KEYS.auth, JSON.stringify(auth))
+        return auth
+    } catch (error) {
+        console.error('Login failed:', error)
+        return null
+    }
 }
 
-export function login(username, password) {
-    const u = USERS[username.toLowerCase()]
-    if (!u || u.password !== password) return null
-    const role = u.role
-    const permissions = Array.from(ROLE_PERMISSIONS[role] || [])
-    const allowedPages = ROLE_PAGES[role] || []
-    const auth = { username: username.toLowerCase(), role, permissions, allowedPages }
-    localStorage.setItem(STORE_KEYS.auth, JSON.stringify(auth))
-    return auth
-}
 
 export function logout() {
     localStorage.removeItem(STORE_KEYS.auth)
@@ -166,7 +177,59 @@ export function clearNotifications() {
     setData(STORE_KEYS.notifications, [])
 }
 
-/* Products */
+/* Products — Async API helpers */
+export async function fetchProducts(page = 1, limit = 100) {
+    try {
+        const result = await api.get(`/products?page=${page}&limit=${limit}`)
+        if (result.success) {
+            // Map snake_case from DB to camelCase for the frontend
+            const mapped = result.data.map(p => ({
+                ...p,
+                costPrice: p.costPrice ?? p.cost_price,
+                supplierId: p.supplierId ?? p.supplier_id,
+                supplierName: p.supplierName ?? p.supplier_name
+            }))
+            setData(STORE_KEYS.products, mapped)
+            return { data: mapped, total: result.total }
+        }
+        return { data: [], total: 0 }
+    } catch (error) {
+        console.error('Failed to fetch products:', error)
+        return { data: getProducts(), total: getProducts().length } // Fallback to local
+    }
+}
+
+export async function createProduct(productData) {
+    try {
+        const result = await api.post('/products', productData)
+        return result.success
+    } catch (error) {
+        console.error('Failed to create product:', error)
+        return false
+    }
+}
+
+export async function updateProductApi(id, productData) {
+    try {
+        const result = await api.put(`/products/${id}`, productData)
+        return result.success
+    } catch (error) {
+        console.error('Failed to update product:', error)
+        return false
+    }
+}
+
+export async function deleteProductApi(id) {
+    try {
+        const result = await api.delete(`/products/${id}`)
+        return result.success
+    } catch (error) {
+        console.error('Failed to delete product:', error)
+        return false
+    }
+}
+
+/* Products — Local Storage (Legacy/Fallback) */
 export function getProducts() { return getData(STORE_KEYS.products) }
 export function saveProducts(data) { setData(STORE_KEYS.products, data) }
 
