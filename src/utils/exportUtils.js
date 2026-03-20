@@ -14,6 +14,78 @@ async function getBase64ImageFromUrl(imageUrl) {
     }
 }
 
+// Generate a full business report PDF
+export async function generateBusinessReport(summary, trends, categories) {
+    const jsPDF = window.jspdf.jsPDF;
+    const doc = new jsPDF();
+    
+    const primaryColor = [63, 81, 181]; // SupplyNest Indigo
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('SupplyNest Business Report', 20, 30);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 38);
+    
+    // Summary Section
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(40, 40, 40);
+    doc.text('Key Performance Indicators', 20, 55);
+    
+    const summaryData = [
+        ['Total Revenue', `₹${summary.total_revenue.toLocaleString()}`],
+        ['Total Orders', summary.total_orders.toString()],
+        ['Total Profit', `₹${summary.total_profit.toLocaleString()}`],
+        ['Best Selling Product', summary.best_product],
+        ['Most Active Customer', summary.best_customer]
+    ];
+    
+    doc.autoTable({
+        startY: 60,
+        body: summaryData,
+        theme: 'striped',
+        styles: { fontSize: 11, cellPadding: 5 }
+    });
+    
+    // Monthly Trends Section
+    let currentY = doc.lastAutoTable.finalY + 15;
+    doc.setFontSize(16);
+    doc.text('Monthly Revenue Trends', 20, currentY);
+    
+    const trendRows = trends.monthly.map(t => [t.month, `₹${t.revenue.toLocaleString()}`, t.orders]);
+    
+    doc.autoTable({
+        startY: currentY + 5,
+        head: [['Month', 'Revenue', 'Orders']],
+        body: trendRows,
+        theme: 'grid',
+        headStyles: { fillColor: primaryColor }
+    });
+
+    // Category Section
+    currentY = doc.lastAutoTable.finalY + 15;
+    doc.setFontSize(16);
+    doc.text('Sales by Category', 20, currentY);
+    
+    const categoryRows = categories.map(c => [c.category, `₹${c.sales.toLocaleString()}`]);
+    
+    doc.autoTable({
+        startY: currentY + 5,
+        head: [['Category', 'Total Sales']],
+        body: categoryRows,
+        theme: 'plain',
+        headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] }
+    });
+    
+    doc.save(`SupplyNest_Business_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
 // Generate Invoice PDF
 export async function generateInvoice(order, customer, product) {
     const jsPDF = window.jspdf.jsPDF;

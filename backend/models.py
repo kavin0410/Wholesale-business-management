@@ -122,6 +122,7 @@ class OrderCreate(BaseModel):
     discount: float = 0
     seasonal: bool = False
     payment_method: str = "Cash"
+    razorpay_id: Optional[str] = None
 
 class OrderOut(BaseModel):
     id: int
@@ -145,6 +146,7 @@ class PaymentCreate(BaseModel):
     order_id: int
     amount: float = Field(gt=0)
     method: str
+    transaction_id: Optional[str] = None
 
 class PaymentOut(BaseModel):
     id: int

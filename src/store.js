@@ -379,6 +379,116 @@ export async function updateSupplierApi(id, supplierData) {
     }
 }
 
+/* Orders — Async API helpers */
+export async function fetchOrders(page = 1, limit = 100) {
+    try {
+        const result = await api.get(`/orders?page=${page}&limit=${limit}`)
+        if (result.success) {
+            // Map snake_case to camelCase where needed for UI compatibility
+            const mapped = result.data.map(o => ({
+                ...o,
+                customerName: o.customer_name,
+                productName: o.product_name,
+                discountAmt: o.discount_amt,
+                paymentMethod: o.payment_method,
+                razorpayId: o.razorpay_id
+            }))
+            setData(STORE_KEYS.orders, mapped)
+            return { data: mapped, total: result.total }
+        }
+        return { data: [], total: 0 }
+    } catch (error) {
+        console.error('Failed to fetch orders:', error)
+        return { data: getOrders(), total: getOrders().length }
+    }
+}
+
+export async function createOrderApi(orderData) {
+    try {
+        // Map camelCase to snake_case for backend
+        const body = {
+            customer_id: Number(orderData.customerId),
+            product_id: Number(orderData.productId),
+            quantity: Number(orderData.quantity),
+            discount: Number(orderData.discount),
+            seasonal: !!orderData.seasonal,
+            payment_method: orderData.paymentMethod,
+            razorpay_id: orderData.razorpayId || null
+        }
+        const result = await api.post('/orders', body)
+        return result
+    } catch (error) {
+        console.error('Failed to create order:', error)
+        throw error
+    }
+}
+
+export async function updateOrderStatusApi(id, status) {
+    try {
+        const result = await api.put(`/orders/${id}/status?status=${status}`)
+        return result.success
+    } catch (error) {
+        console.error('Failed to update order status:', error)
+        return false
+    }
+}
+
+export async function deleteOrderApi(id) {
+    try {
+        const result = await api.delete(`/orders/${id}`)
+        return result.success
+    } catch (error) {
+        console.error('Failed to delete order:', error)
+        return false
+    }
+}
+
+/* Payments — Async API helpers */
+export async function fetchPayments(page = 1, limit = 100) {
+    try {
+        const result = await api.get(`/payments?page=${page}&limit=${limit}`)
+        if (result.success) {
+            const mapped = result.data.map(p => ({
+                ...p,
+                customerName: p.customer_name,
+                transactionId: p.transaction_id
+            }))
+            setData(STORE_KEYS.payments, mapped)
+            return { data: mapped, total: result.total }
+        }
+        return { data: [], total: 0 }
+    } catch (error) {
+        console.error('Failed to fetch payments:', error)
+        return { data: getPayments(), total: getPayments().length }
+    }
+}
+
+export async function fetchPaymentSummaryApi() {
+    try {
+        const result = await api.get('/payments/summary')
+        return result.success ? result.data : null
+    } catch (error) {
+        console.error('Failed to fetch payment summary:', error)
+        return null
+    }
+}
+
+export async function createPaymentApi(paymentData) {
+    try {
+        const body = {
+            order_id: Number(paymentData.orderId),
+            amount: Number(paymentData.amount),
+            method: paymentData.method,
+            transaction_id: paymentData.transactionId || null
+        }
+        const result = await api.post('/payments', body)
+        return result.success
+    } catch (error) {
+        console.error('Failed to record payment:', error)
+        return false
+    }
+}
+
 export async function deleteSupplierApi(id) {
     try {
         const result = await api.delete(`/suppliers/${id}`)
@@ -386,6 +496,37 @@ export async function deleteSupplierApi(id) {
     } catch (error) {
         console.error('Failed to delete supplier:', error)
         return false
+    }
+}
+
+/* Reports — Async API helpers */
+export async function fetchReportSummaryApi() {
+    try {
+        const result = await api.get('/reports/summary')
+        return result.success ? result.data : null
+    } catch (error) {
+        console.error('Failed to fetch report summary:', error)
+        return null
+    }
+}
+
+export async function fetchReportTrendsApi() {
+    try {
+        const result = await api.get('/reports/trends')
+        return result.success ? result.data : null
+    } catch (error) {
+        console.error('Failed to fetch report trends:', error)
+        return null
+    }
+}
+
+export async function fetchReportCategoriesApi() {
+    try {
+        const result = await api.get('/reports/categories')
+        return result.success ? result.data : []
+    } catch (error) {
+        console.error('Failed to fetch category report:', error)
+        return []
     }
 }
 

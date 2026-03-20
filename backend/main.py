@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db
-from routes import auth, products, customers, suppliers, orders, payments, delivery, dashboard, ai, staff
+from routes import auth, products, customers, suppliers, orders, payments, delivery, dashboard, ai, staff, reports
 
 # ── Logging ──────────────────────────────────────────
 logging.basicConfig(
@@ -33,7 +33,7 @@ app.add_middleware(
 )
 
 # ── Register routers under /api ──────────────────────
-for r in (auth, products, customers, suppliers, orders, payments, delivery, dashboard, ai, staff):
+for r in (auth, products, customers, suppliers, orders, payments, delivery, dashboard, ai, staff, reports):
     app.include_router(r.router, prefix="/api")
 
 # ── Startup ──────────────────────────────────────────

@@ -1,11 +1,13 @@
-import { useState, useMemo } from 'react'
-import { getOrders, saveOrders, getProducts, saveProducts, getCustomers, nextId, addNotification, savePayments, getPayments, hasPermission } from '../store'
+import { useState, useMemo, useEffect } from 'react'
+import { fetchOrders, createOrderApi, updateOrderStatusApi, deleteOrderApi, fetchProducts, fetchCustomers, createPaymentApi, addNotification, hasPermission } from '../store'
 import { generateInvoice } from '../utils/exportUtils'
 
 export default function Orders({ showToast, formatCurrency, refresh, auth }) {
-    const [orders, setOrders] = useState(getOrders())
-    const products = getProducts()
-    const customers = getCustomers()
+    const [orders, setOrders] = useState([])
+    const [products, setProducts] = useState([])
+    const [customers, setCustomers] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [submitting, setSubmitting] = useState(false)
     const [form, setForm] = useState({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
 
     // RBAC checks
@@ -13,7 +15,23 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
     const canEdit = hasPermission('orders:edit')
     const canDelete = hasPermission('orders:delete')
 
-    const reload = () => { setOrders(getOrders()); refresh() }
+    const loadPageData = async () => {
+        setLoading(true)
+        const [ordersRes, prodsRes, custsRes] = await Promise.all([
+            fetchOrders(),
+            fetchProducts(),
+            fetchCustomers()
+        ])
+        setOrders(ordersRes.data)
+        setProducts(prodsRes.data)
+        setCustomers(custsRes.data)
+        setLoading(false)
+        refresh()
+    }
+
+    useEffect(() => {
+        loadPageData()
+    }, [])
 
     // Auto calc
     const calcResult = useMemo(() => {
@@ -29,44 +47,47 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
         return { subtotal, discountAmt, total, discountPct }
     }, [form, products])
 
-    const handleRazorpay = (orderData, prod, cust) => {
+    const handleRazorpay = (formData, prod, cust) => {
         const options = {
-            key: "rzp_test_dummykey", // In production, move to env
-            amount: Math.round(orderData.total * 100),
+            key: "rzp_test_dummykey", 
+            amount: Math.round(calcResult.total * 100),
             currency: "INR",
             name: "SupplyNest Wholesale",
-            description: `Order #${orderData.id}`,
-            handler: function (response) {
+            description: `Order for ${prod.name}`,
+            handler: async function (response) {
                 // Payment success
-                const orders = getOrders()
-                orderData.razorpayId = response.razorpay_payment_id
-                orderData.status = 'Paid'
-                orders.push(orderData)
-                saveOrders(orders)
-
-                // Record payment
-                const payments = getPayments()
-                payments.push({
-                    id: Date.now(),
-                    orderId: orderData.id,
-                    customerId: cust.id,
-                    amount: orderData.total,
-                    method: orderData.paymentMethod,
-                    date: new Date().toLocaleDateString(),
-                    transactionId: response.razorpay_payment_id
-                })
-                savePayments(payments)
-
-                // Update stock
-                const allProds = getProducts()
-                const pi = allProds.findIndex(p => p.id === prod.id)
-                if (pi >= 0) { allProds[pi].stock -= orderData.quantity; saveProducts(allProds) }
-
-                showToast('Payment Successful! Order Placed.', 'success')
-                addNotification(`Order #${orderData.id} Paid via Razorpay`, 'order')
-                generateInvoice(orderData, cust, prod)
-                setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
-                reload()
+                setSubmitting(true)
+                try {
+                    const orderPayload = {
+                        ...formData,
+                        razorpayId: response.razorpay_payment_id
+                    }
+                    const result = await createOrderApi(orderPayload)
+                    if (result.success) {
+                        showToast('Payment Successful! Order Placed.', 'success')
+                        addNotification(`Order #${result.data.id} Paid via Razorpay`, 'order')
+                        
+                        // Generate invoice (backend returns delivery info too)
+                        const orderDataForInvoice = {
+                            id: result.data.id,
+                            ...formData,
+                            total: calcResult.total,
+                            discountAmt: calcResult.discountAmt,
+                            date: new Date().toLocaleDateString(),
+                            razorpayId: response.razorpay_payment_id
+                        }
+                        generateInvoice(orderDataForInvoice, cust, prod)
+                        
+                        setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
+                        loadPageData()
+                    } else {
+                        showToast(result.message || 'Failed to finalize order', 'error')
+                    }
+                } catch (error) {
+                    showToast('Critical error finalizing order', 'error')
+                } finally {
+                    setSubmitting(false)
+                }
             },
             prefill: {
                 name: cust.name,
@@ -79,7 +100,7 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
         rzp.open()
     }
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
         if (!canCreate) return showToast('⛔ You do not have permission to create orders', 'error')
 
@@ -89,70 +110,70 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
         const qty = Number(form.quantity)
         if (qty > prod.stock) return showToast('Not enough stock!', 'error')
 
-        const data = getOrders()
-        const order = {
-            id: nextId(data),
-            customerId: cust.id,
-            productId: prod.id,
-            quantity: qty,
-            discount: calcResult.discountPct,
-            discountAmt: calcResult.discountAmt,
-            total: calcResult.total,
-            profit: (prod.price - prod.costPrice) * qty - calcResult.discountAmt,
-            status: 'Pending',
-            paymentMethod: form.paymentMethod,
-            date: new Date().toLocaleDateString(),
-        }
-
         if (['UPI', 'QR Code', 'Debit Card', 'Credit Card'].includes(form.paymentMethod)) {
-            handleRazorpay(order, prod, cust)
+            handleRazorpay(form, prod, cust)
             return
         }
 
         // Cash payment
-        data.push(order)
-        saveOrders(data)
+        setSubmitting(true)
+        try {
+            const result = await createOrderApi(form)
+            if (result.success) {
+                const orderId = result.data.id
+                
+                // Record cash payment
+                await createPaymentApi({
+                    orderId: orderId,
+                    amount: calcResult.total,
+                    method: 'Cash'
+                })
 
-        // Record payment for cash too (as partial or full)
-        const payments = getPayments()
-        payments.push({
-            id: Date.now(),
-            orderId: order.id,
-            customerId: cust.id,
-            amount: order.total,
-            method: 'Cash',
-            date: new Date().toLocaleDateString()
-        })
-        savePayments(payments)
-
-        // Update stock
-        const allProds = getProducts()
-        const pi = allProds.findIndex(p => p.id === prod.id)
-        if (pi >= 0) { allProds[pi].stock -= qty; saveProducts(allProds) }
-
-        showToast('Order placed successfully!', 'success')
-        addNotification(`Order #${order.id}: ${cust.name} ordered ${prod.name} ×${qty}`, 'order')
-        
-        // Auto generate PDF for Cash too
-        generateInvoice(order, cust, prod)
-        
-        setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
-        reload()
+                showToast('Order placed successfully!', 'success')
+                addNotification(`Order #${orderId}: ${cust.name} ordered ${prod.name} ×${qty}`, 'order')
+                
+                const orderDataForInvoice = {
+                    id: orderId,
+                    ...form,
+                    total: calcResult.total,
+                    discountAmt: calcResult.discountAmt,
+                    date: new Date().toLocaleDateString()
+                }
+                generateInvoice(orderDataForInvoice, cust, prod)
+                
+                setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
+                loadPageData()
+            } else {
+                showToast(result.message || 'Failed to place order', 'error')
+            }
+        } catch (error) {
+            showToast('API Connection Error', 'error')
+        } finally {
+            setSubmitting(false)
+        }
     }
 
-    const handleStatus = (id, status) => {
+    const handleStatus = async (id, status) => {
         if (!canEdit) return showToast('⛔ You do not have permission to change order status', 'error')
-        const data = getOrders()
-        const o = data.find(x => x.id === id)
-        if (o) { o.status = status; saveOrders(data); showToast(`Order #${id} marked ${status}`, 'info'); reload() }
+        const success = await updateOrderStatusApi(id, status)
+        if (success) {
+            showToast(`Order #${id} marked ${status}`, 'info')
+            loadPageData()
+        } else {
+            showToast('Failed to update status', 'error')
+        }
     }
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (!canDelete) return showToast('⛔ You do not have permission to delete orders', 'error')
         if (!confirm('Delete this order?')) return
-        saveOrders(getOrders().filter(o => o.id !== id))
-        showToast('Order deleted', 'error')
-        reload()
+        const success = await deleteOrderApi(id)
+        if (success) {
+            showToast('Order deleted', 'error')
+            loadPageData()
+        } else {
+            showToast('Failed to delete order', 'error')
+        }
     }
 
     return (

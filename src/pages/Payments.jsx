@@ -1,22 +1,44 @@
-import { useState } from 'react'
-import { getPayments, savePayments, getOrders, getCustomers, nextId, addNotification, hasPermission } from '../store'
+import { useState, useEffect } from 'react'
+import { fetchPayments, createPaymentApi, fetchPaymentSummaryApi, fetchOrders, fetchCustomers, addNotification, hasPermission } from '../store'
 
 export default function Payments({ showToast, formatCurrency, refresh, auth }) {
-    const [payments, setPayments] = useState(getPayments())
-    const orders = getOrders()
-    const customers = getCustomers()
+    const [payments, setPayments] = useState([])
+    const [orders, setOrders] = useState([])
+    const [customers, setCustomers] = useState([])
+    const [summary, setSummary] = useState({ total_revenue: 0, total_paid: 0, pending: 0 })
+    const [loading, setLoading] = useState(true)
+    const [submitting, setSubmitting] = useState(false)
     const [form, setForm] = useState({ orderId: '', amount: '', method: '' })
 
     // RBAC checks
     const canCreate = hasPermission('payments:create')
 
-    const reload = () => { setPayments(getPayments()); refresh() }
+    const loadData = async () => {
+        setLoading(true)
+        try {
+            const [payRes, ordRes, custRes, summRes] = await Promise.all([
+                fetchPayments(),
+                fetchOrders(),
+                fetchCustomers(),
+                fetchPaymentSummaryApi()
+            ])
+            setPayments(payRes.data)
+            setOrders(ordRes.data)
+            setCustomers(custRes.data)
+            if (summRes) setSummary(summRes)
+        } catch (err) {
+            showToast('Failed to load payment data', 'error')
+        } finally {
+            setLoading(false)
+            refresh()
+        }
+    }
 
-    const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0)
-    const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0)
-    const pending = totalRevenue - totalPaid
+    useEffect(() => {
+        loadData()
+    }, [])
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
         if (!canCreate) return showToast('⛔ You do not have permission to record payments', 'error')
 
@@ -24,21 +46,27 @@ export default function Payments({ showToast, formatCurrency, refresh, auth }) {
         if (!order) return showToast('Select a valid order', 'error')
         const cust = customers.find(c => c.id === order.customerId)
 
-        const data = getPayments()
-        const payment = {
-            id: nextId(data),
-            orderId: order.id,
-            customerId: order.customerId,
-            amount: Number(form.amount),
-            method: form.method,
-            date: new Date().toLocaleDateString(),
+        setSubmitting(true)
+        try {
+            const success = await createPaymentApi({
+                orderId: order.id,
+                amount: form.amount,
+                method: form.method
+            })
+
+            if (success) {
+                showToast('Payment recorded!', 'success')
+                addNotification(`Payment of ₹${form.amount} received from ${cust?.name || 'customer'}`, 'payment')
+                setForm({ orderId: '', amount: '', method: '' })
+                loadData()
+            } else {
+                showToast('Failed to record payment', 'error')
+            }
+        } catch (err) {
+            showToast('API Connection Error', 'error')
+        } finally {
+            setSubmitting(false)
         }
-        data.push(payment)
-        savePayments(data)
-        showToast('Payment recorded!', 'success')
-        addNotification(`Payment of ₹${form.amount} received from ${cust?.name || 'customer'}`, 'payment')
-        setForm({ orderId: '', amount: '', method: '' })
-        reload()
     }
 
     return (
@@ -51,15 +79,15 @@ export default function Payments({ showToast, formatCurrency, refresh, auth }) {
             <div className="payment-summary-grid">
                 <div className="payment-summary-card">
                     <h4>Total Revenue</h4>
-                    <div className="amount text-success">{formatCurrency(totalRevenue)}</div>
+                    <div className="amount text-success">{formatCurrency(summary.total_revenue || 0)}</div>
                 </div>
                 <div className="payment-summary-card">
                     <h4>Payments Received</h4>
-                    <div className="amount text-success">{formatCurrency(totalPaid)}</div>
+                    <div className="amount text-success">{formatCurrency(summary.total_paid || 0)}</div>
                 </div>
                 <div className="payment-summary-card">
                     <h4>Pending Amount</h4>
-                    <div className="amount text-warning">{formatCurrency(pending)}</div>
+                    <div className="amount text-warning">{formatCurrency(summary.pending || 0)}</div>
                 </div>
             </div>
 

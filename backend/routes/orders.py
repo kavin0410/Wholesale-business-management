@@ -63,9 +63,10 @@ def create_order(
     now = datetime.now().strftime("%Y-%m-%d")
 
     cur = conn.execute(
-        """INSERT INTO orders (customer_id,product_id,staff_id,quantity,discount,discount_amt,total,profit,status,payment_method,date)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-        (body.customer_id, body.product_id, user["id"], body.quantity, discount_pct, discount_amt, total, profit, "Pending", body.payment_method, now)
+        """INSERT INTO orders (customer_id,product_id,staff_id,quantity,discount,discount_amt,total,profit,status,payment_method,razorpay_id,date)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (body.customer_id, body.product_id, user["id"], body.quantity, discount_pct, discount_amt, total, profit, 
+         "Paid" if body.razorpay_id else "Pending", body.payment_method, body.razorpay_id, now)
     )
     order_id = cur.lastrowid
 
@@ -80,6 +81,17 @@ def create_order(
             last_updated = ?
         WHERE staff_id = ?
     """, (total, datetime.now().isoformat(), user["id"]))
+
+    # If it's a prepaid order (Razorpay), also record the payment immediately
+    if body.razorpay_id:
+        conn.execute(
+            "INSERT INTO payments (order_id, customer_id, staff_id, amount, method, transaction_id, date) 
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (order_id, body.customer_id, user["id"], total, body.payment_method, body.razorpay_id, now)
+        )
+        conn.execute("""
+            UPDATE staff_performance SET total_payments = total_payments + 1 WHERE staff_id = ?
+        """, (user["id"],))
 
     logger.info("Stock updated: product_id=%d decreased by %d (by %s)", body.product_id, body.quantity, user["username"])
 

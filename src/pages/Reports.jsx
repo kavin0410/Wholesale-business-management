@@ -1,48 +1,59 @@
-import { useEffect, useRef, useMemo } from 'react'
-import { getProducts, getOrders, getCustomers, hasPermission } from '../store'
-import { exportToExcel } from '../utils/exportUtils'
+import { useState, useEffect, useRef } from 'react'
+import { fetchReportSummaryApi, fetchReportTrendsApi, fetchReportCategoriesApi, hasPermission, fetchOrders, fetchCustomers, fetchProducts } from '../store'
+import { exportToExcel, generateBusinessReport } from '../utils/exportUtils'
 import { Chart, registerables } from 'chart.js'
 
 Chart.register(...registerables)
 
 export default function Reports({ formatCurrency, auth }) {
+    const [summary, setSummary] = useState({ best_product: '—', best_customer: '—', total_revenue: 0, total_orders: 0, total_profit: 0 })
+    const [trends, setTrends] = useState({ monthly: [], weekly: [] })
+    const [categories, setCategories] = useState([])
+    const [loading, setLoading] = useState(true)
+    
+    // For raw exports
+    const [rawOrders, setRawOrders] = useState([])
+    const [rawCustomers, setRawCustomers] = useState([])
+    const [rawProducts, setRawProducts] = useState([])
+
     const canView = hasPermission('reports:view')
     const canExport = hasPermission('export:data')
 
-    const products = getProducts()
-    const orders = getOrders()
-    const customers = getCustomers()
     const weeklyRef = useRef(null)
     const monthlyRef = useRef(null)
     const catRef = useRef(null)
     const chartsRef = useRef([])
 
-    const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0)
-
-    // Most profitable product
-    const bestProduct = useMemo(() => {
-        const profitMap = {}
-        orders.forEach(o => {
-            const p = products.find(pr => pr.id === o.productId)
-            if (p) profitMap[p.name] = (profitMap[p.name] || 0) + (o.profit || 0)
-        })
-        const entries = Object.entries(profitMap)
-        return entries.length ? entries.sort((a, b) => b[1] - a[1])[0][0] : '—'
-    }, [orders, products])
-
-    // Most active customer
-    const bestCustomer = useMemo(() => {
-        const countMap = {}
-        orders.forEach(o => {
-            const c = customers.find(cu => cu.id === o.customerId)
-            if (c) countMap[c.name] = (countMap[c.name] || 0) + 1
-        })
-        const entries = Object.entries(countMap)
-        return entries.length ? entries.sort((a, b) => b[1] - a[1])[0][0] : '—'
-    }, [orders, customers])
+    const loadData = async () => {
+        setLoading(true)
+        try {
+            const [summ, trend, cats, ords, custs, prods] = await Promise.all([
+                fetchReportSummaryApi(),
+                fetchReportTrendsApi(),
+                fetchReportCategoriesApi(),
+                fetchOrders(),
+                fetchCustomers(),
+                fetchProducts()
+            ])
+            if (summ) setSummary(summ)
+            if (trend) setTrends(trend)
+            setCategories(cats)
+            setRawOrders(ords.data)
+            setRawCustomers(custs.data)
+            setRawProducts(prods.data)
+        } catch (err) {
+            console.error('Failed to load reports:', err)
+        } finally {
+            setLoading(false)
+        }
+    }
 
     useEffect(() => {
-        if (!canView) return
+        if (canView) loadData()
+    }, [])
+
+    useEffect(() => {
+        if (loading || !canView) return
 
         // Cleanup
         chartsRef.current.forEach(c => c?.destroy())
@@ -61,22 +72,14 @@ export default function Reports({ formatCurrency, auth }) {
         }
 
         // Weekly sales
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-        const weeklySales = new Array(7).fill(0)
-        orders.forEach(o => {
-            const d = new Date(o.date)
-            const day = d.getDay()
-            weeklySales[day === 0 ? 6 : day - 1] += o.total || 0
-        })
-
-        if (weeklyRef.current) {
+        if (weeklyRef.current && trends.weekly.length > 0) {
             chartsRef.current.push(new Chart(weeklyRef.current, {
                 type: 'bar',
                 data: {
-                    labels: days,
+                    labels: trends.weekly.map(w => w.date.split('-').slice(1).join('/')), // MM/DD
                     datasets: [{
                         label: 'Sales',
-                        data: weeklySales,
+                        data: trends.weekly.map(w => w.revenue),
                         backgroundColor: 'rgba(99, 102, 241, 0.6)',
                         borderColor: '#6366f1',
                         borderWidth: 2,
@@ -88,21 +91,14 @@ export default function Reports({ formatCurrency, auth }) {
         }
 
         // Monthly revenue
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        const monthlyRevenue = new Array(12).fill(0)
-        orders.forEach(o => {
-            const d = new Date(o.date)
-            monthlyRevenue[d.getMonth()] += o.total || 0
-        })
-
-        if (monthlyRef.current) {
+        if (monthlyRef.current && trends.monthly.length > 0) {
             chartsRef.current.push(new Chart(monthlyRef.current, {
                 type: 'line',
                 data: {
-                    labels: months,
+                    labels: trends.monthly.map(m => m.month),
                     datasets: [{
                         label: 'Revenue',
-                        data: monthlyRevenue,
+                        data: trends.monthly.map(m => m.revenue),
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
                         fill: true,
@@ -117,14 +113,8 @@ export default function Reports({ formatCurrency, auth }) {
         }
 
         // Category pie
-        const catSales = {}
-        orders.forEach(o => {
-            const p = products.find(pr => pr.id === o.productId)
-            if (p) catSales[p.category] = (catSales[p.category] || 0) + (o.total || 0)
-        })
-
-        const catLabels = Object.keys(catSales)
-        const catData = Object.values(catSales)
+        const catLabels = categories.map(c => c.category)
+        const catData = categories.map(c => c.sales)
         const pieColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16']
 
         if (catRef.current && catLabels.length > 0) {
@@ -152,7 +142,7 @@ export default function Reports({ formatCurrency, auth }) {
         return () => {
             chartsRef.current.forEach(c => c?.destroy())
         }
-    }, [orders, products, canView])
+    }, [loading, trends, categories, canView])
 
     // Staff should never reach this page (blocked at nav level),
     // but just in case, show access denied
@@ -171,18 +161,25 @@ export default function Reports({ formatCurrency, auth }) {
         )
     }
 
+    if (loading) return <div className="page-enter"><div className="loading-state">Loading Analytics...</div></div>
+
     return (
         <div className="page-enter">
             <div className="page-header">
                 <h1>Reports & Analytics</h1>
                 <p>Insights and performance metrics for your business</p>
+                {canExport && (
+                    <button className="btn btn-primary" onClick={() => generateBusinessReport(summary, trends, categories)}>
+                        📄 Download Full PDF Report
+                    </button>
+                )}
             </div>
 
             <div className="stats-grid">
                 <div className="stat-card">
                     <div className="stat-icon purple">💰</div>
                     <div className="stat-info">
-                        <h3>{formatCurrency(totalRevenue)}</h3>
+                        <h3>{formatCurrency(summary.total_revenue)}</h3>
                         <p>Total Revenue</p>
                         <span className="stat-growth up">↑ Lifetime</span>
                     </div>
@@ -190,7 +187,7 @@ export default function Reports({ formatCurrency, auth }) {
                 <div className="stat-card">
                     <div className="stat-icon orange">🛒</div>
                     <div className="stat-info">
-                        <h3>{orders.length}</h3>
+                        <h3>{summary.total_orders}</h3>
                         <p>Total Orders</p>
                         <span className="stat-growth up">↑ All time</span>
                     </div>
@@ -198,15 +195,15 @@ export default function Reports({ formatCurrency, auth }) {
                 <div className="stat-card">
                     <div className="stat-icon green">🏆</div>
                     <div className="stat-info">
-                        <h3>{bestProduct}</h3>
-                        <p>Most Profitable Product</p>
+                        <h3>{summary.best_product}</h3>
+                        <p>Top Product (Profit)</p>
                     </div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-icon blue">⭐</div>
                     <div className="stat-info">
-                        <h3>{bestCustomer}</h3>
-                        <p>Most Active Customer</p>
+                        <h3>{summary.best_customer}</h3>
+                        <p>Top Customer (Spend)</p>
                     </div>
                 </div>
             </div>
@@ -229,16 +226,16 @@ export default function Reports({ formatCurrency, auth }) {
 
             {canExport && (
                 <div className="card">
-                    <div className="card-title"><span className="icon">💾</span> Data Backup & Export</div>
+                    <div className="card-title"><span className="icon">💾</span> Data Backup & Raw Exports</div>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>Download your business data in Excel (.xlsx) format for backup or external analysis.</p>
                     <div className="btn-group">
-                        <button className="btn btn-success" onClick={() => exportToExcel(orders, 'Orders_Backup')}>
+                        <button className="btn btn-success" onClick={() => exportToExcel(rawOrders, 'Orders_Detailed_Export')}>
                             📊 Export Orders
                         </button>
-                        <button className="btn btn-primary" onClick={() => exportToExcel(customers, 'Customers_Backup')}>
+                        <button className="btn btn-primary" onClick={() => exportToExcel(rawCustomers, 'Customers_Detailed_Export')}>
                             👥 Export Customers
                         </button>
-                        <button className="btn btn-warning" onClick={() => exportToExcel(products, 'Inventory_Backup')}>
+                        <button className="btn btn-warning" onClick={() => exportToExcel(rawProducts, 'Inventory_Detailed_Export')}>
                             📦 Export Inventory
                         </button>
                     </div>
