@@ -50,9 +50,18 @@ def create_payment(
         raise HTTPException(404, "Order not found")
     now = datetime.now().strftime("%Y-%m-%d")
     cur = conn.execute(
-        "INSERT INTO payments (order_id,customer_id,amount,method,date) VALUES (?,?,?,?,?)",
-        (body.order_id, order["customer_id"], body.amount, body.method, now)
+        "INSERT INTO payments (order_id,customer_id,staff_id,amount,method,date) VALUES (?,?,?,?,?,?)",
+        (body.order_id, order["customer_id"], user["id"], body.amount, body.method, now)
     )
+    
+    # Update Staff Performance
+    conn.execute("""
+        UPDATE staff_performance 
+        SET total_payments = total_payments + 1,
+            last_updated = ?
+        WHERE staff_id = ?
+    """, (datetime.now().isoformat(), user["id"]))
+
     conn.commit()
     pid = cur.lastrowid
     conn.close()

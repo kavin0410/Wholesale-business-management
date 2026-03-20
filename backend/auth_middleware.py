@@ -36,6 +36,9 @@ ROLE_PERMISSIONS = {
         "settings:view", "settings:edit",
         "users:manage",
         "export:data",
+        # Staff Management
+        "staff:view", "staff:create", "staff:edit", "staff:delete",
+        "performance:view",
         # AI
         "ai:view",
     },
@@ -56,6 +59,8 @@ ROLE_PERMISSIONS = {
         "delivery:view", "delivery:edit",
         # AI recommendations — view
         "ai:view",
+        # Performance — can view own (logic handled in API)
+        "performance:view",
     },
 }
 

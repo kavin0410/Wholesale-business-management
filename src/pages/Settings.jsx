@@ -1,11 +1,86 @@
-import { useRef } from 'react'
-import { exportBackup, importBackup, hasPermission } from '../store'
+import { useRef, useState, useEffect } from 'react'
+import { 
+    exportBackup, 
+    importBackup, 
+    hasPermission, 
+    fetchStaffs, 
+    createStaff, 
+    updateStaff, 
+    deleteStaff,
+    fetchAllPerformance
+} from '../store'
 
 export default function Settings({ showToast, refresh, auth }) {
     const fileRef = useRef(null)
+    const [staffs, setStaffs] = useState([])
+    const [performance, setPerformance] = useState([])
+    const [loading, setLoading] = useState(false)
+    const [editId, setEditId] = useState(null)
+    const [form, setForm] = useState({ username: '', password: '', name: '', email: '', phone: '', address: '' })
 
     const canView = hasPermission('settings:view')
     const canEdit = hasPermission('settings:edit')
+    const canManageStaff = hasPermission('staff:view')
+
+    useEffect(() => {
+        if (canManageStaff) {
+            loadStaffData()
+        }
+    }, [canManageStaff])
+
+    const loadStaffData = async () => {
+        setLoading(true)
+        try {
+            const { data } = await fetchStaffs()
+            const perf = await fetchAllPerformance()
+            setStaffs(data)
+            setPerformance(perf)
+        } catch (err) {
+            showToast('Failed to load staff data', 'error')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleStaffSubmit = async (e) => {
+        e.preventDefault()
+        setLoading(true)
+        try {
+            let success = false
+            if (editId) {
+                success = await updateStaff(editId, form)
+                if (success) showToast('Staff updated successfully', 'success')
+            } else {
+                success = await createStaff(form)
+                if (success) showToast('Staff account created', 'success')
+            }
+            if (success) {
+                setEditId(null)
+                setForm({ username: '', password: '', name: '', email: '', phone: '', address: '' })
+                loadStaffData()
+            } else {
+                showToast('Action failed', 'error')
+            }
+        } catch (err) {
+            showToast('Error saving staff', 'error')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleEdit = (s) => {
+        setEditId(s.id)
+        setForm({ username: s.username, password: '', name: s.name || '', email: s.email || '', phone: s.phone || '', address: s.address || '' })
+    }
+
+    const handleDelete = async (id) => {
+        if (!confirm('Delete this staff account?')) return
+        const success = await deleteStaff(id)
+        if (success) {
+            showToast('Staff deleted', 'error')
+            loadStaffData()
+        }
+    }
 
     const handleBackup = () => {
         if (!canEdit) return showToast('⛔ You do not have permission to export data', 'error')
@@ -26,8 +101,6 @@ export default function Settings({ showToast, refresh, auth }) {
         }
     }
 
-    // Staff should never reach this page (blocked at nav level),
-    // but just in case, show access denied
     if (!canView) {
         return (
             <div className="page-enter">
@@ -47,10 +120,63 @@ export default function Settings({ showToast, refresh, auth }) {
         <div className="page-enter">
             <div className="page-header">
                 <h1>Settings</h1>
-                <p>Backup, restore, and application preferences</p>
+                <p>Manage staff, backup/restore, and application preferences</p>
             </div>
 
-            <div className="settings-grid">
+            {canManageStaff && (
+                <div className="staff-management-section">
+                    <div className="card">
+                        <div className="card-title"><span className="icon">👥</span> {editId ? 'Edit Staff' : 'Add New Staff'}</div>
+                        <form onSubmit={handleStaffSubmit} className="form-grid">
+                            <input type="text" placeholder="Username" value={form.username} onChange={e => setForm({...form, username: e.target.value})} required disabled={!!editId} />
+                            <input type="password" placeholder={editId ? "New Password (optional)" : "Password"} value={form.password} onChange={e => setForm({...form, password: e.target.value})} required={!editId} />
+                            <input type="text" placeholder="Full Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
+                            <input type="email" placeholder="Email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required />
+                            <input type="text" placeholder="Phone" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
+                            <input type="text" placeholder="Address" value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
+                            <div className="btn-group">
+                                <button type="submit" className="btn btn-primary" disabled={loading}>{editId ? 'Update Staff' : 'Add Staff'}</button>
+                                {editId && <button type="button" className="btn btn-danger" onClick={() => {setEditId(null); setForm({username:'', password:'', name:'', email:'', phone:'', address:''})}}>Cancel</button>}
+                            </div>
+                        </form>
+                    </div>
+
+                    <div className="card" style={{ marginTop: '24px' }}>
+                        <div className="card-title"><span className="icon">📋</span> Staff List & Performance Summary</div>
+                        <div className="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th><th>Username</th><th>Email</th><th>Orders</th><th>Sales</th><th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {staffs.map(s => {
+                                        const p = performance.find(x => x.staff_id === s.id) || {}
+                                        return (
+                                            <tr key={s.id}>
+                                                <td><strong>{s.name}</strong></td>
+                                                <td>{s.username}</td>
+                                                <td>{s.email}</td>
+                                                <td><span className="status-badge status-delivered">{p.total_orders || 0}</span></td>
+                                                <td>₹{(p.total_sales_amount || 0).toLocaleString()}</td>
+                                                <td>
+                                                    <div className="btn-group">
+                                                        <button className="btn btn-warning btn-sm" onClick={() => handleEdit(s)}>✏️</button>
+                                                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s.id)}>🗑️</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="settings-grid" style={{ marginTop: '24px' }}>
                 <div className="card">
                     <div className="card-title"><span className="icon">💾</span> Backup Data</div>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: 20, fontSize: 14 }}>

@@ -9,6 +9,7 @@ const STORE_KEYS = {
     notifications: 'wbms_notifications',
     auth: 'wbms_auth',
     currency: 'wbms_currency',
+    staff: 'wbms_staff',
 }
 
 export function getData(key) {
@@ -60,6 +61,8 @@ const ROLE_PERMISSIONS = {
         'settings:view', 'settings:edit',
         'users:manage',
         'export:data',
+        'staff:view', 'staff:create', 'staff:edit', 'staff:delete',
+        'performance:view',
         'ai:view',
     ]),
     staff: new Set([
@@ -70,6 +73,7 @@ const ROLE_PERMISSIONS = {
         'payments:view',
         'dashboard:view',
         'delivery:view', 'delivery:edit',
+        'performance:view',
         'ai:view',
     ]),
 }
@@ -226,6 +230,72 @@ export async function deleteProductApi(id) {
     } catch (error) {
         console.error('Failed to delete product:', error)
         return false
+    }
+}
+
+/* Staff Management — Async API helpers */
+export async function fetchStaffs(page = 1, limit = 20) {
+    try {
+        const result = await api.get(`/admin/staff?page=${page}&limit=${limit}`)
+        if (result.success) {
+            setData(STORE_KEYS.staff, result.data)
+            return { data: result.data, total: result.total }
+        }
+        return { data: [], total: 0 }
+    } catch (error) {
+        console.error('Failed to fetch staff:', error)
+        return { data: getData(STORE_KEYS.staff), total: getData(STORE_KEYS.staff).length }
+    }
+}
+
+export async function createStaff(staffData) {
+    try {
+        const result = await api.post('/admin/staff', staffData)
+        return result.success
+    } catch (error) {
+        console.error('Failed to create staff:', error)
+        return false
+    }
+}
+
+export async function updateStaff(id, staffData) {
+    try {
+        const result = await api.put(`/admin/staff/${id}`, staffData)
+        return result.success
+    } catch (error) {
+        console.error('Failed to update staff:', error)
+        return false
+    }
+}
+
+export async function deleteStaff(id) {
+    try {
+        const result = await api.delete(`/admin/staff/${id}`)
+        return result.success
+    } catch (error) {
+        console.error('Failed to delete staff:', error)
+        return false
+    }
+}
+
+/* Staff Performance — Async API helpers */
+export async function fetchAllPerformance() {
+    try {
+        const result = await api.get('/admin/performance')
+        return result.success ? result.data : []
+    } catch (error) {
+        console.error('Failed to fetch performance:', error)
+        return []
+    }
+}
+
+export async function fetchStaffPerformance(id) {
+    try {
+        const result = await api.get(`/admin/performance/${id}`)
+        return result.success ? result.data : null
+    } catch (error) {
+        console.error('Failed to fetch staff performance:', error)
+        return null
     }
 }
 

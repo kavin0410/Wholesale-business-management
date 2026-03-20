@@ -63,14 +63,24 @@ def create_order(
     now = datetime.now().strftime("%Y-%m-%d")
 
     cur = conn.execute(
-        """INSERT INTO orders (customer_id,product_id,quantity,discount,discount_amt,total,profit,status,payment_method,date)
-           VALUES (?,?,?,?,?,?,?,?,?,?)""",
-        (body.customer_id, body.product_id, body.quantity, discount_pct, discount_amt, total, profit, "Pending", body.payment_method, now)
+        """INSERT INTO orders (customer_id,product_id,staff_id,quantity,discount,discount_amt,total,profit,status,payment_method,date)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+        (body.customer_id, body.product_id, user["id"], body.quantity, discount_pct, discount_amt, total, profit, "Pending", body.payment_method, now)
     )
     order_id = cur.lastrowid
 
     # Decrease stock
     conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", (body.quantity, body.product_id))
+    
+    # Update Staff Performance
+    conn.execute("""
+        UPDATE staff_performance 
+        SET total_orders = total_orders + 1, 
+            total_sales_amount = total_sales_amount + ?,
+            last_updated = ?
+        WHERE staff_id = ?
+    """, (total, datetime.now().isoformat(), user["id"]))
+
     logger.info("Stock updated: product_id=%d decreased by %d (by %s)", body.product_id, body.quantity, user["username"])
 
     # Auto-create delivery record

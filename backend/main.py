@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db
-from routes import auth, products, customers, orders, payments, delivery, dashboard, ai
+from routes import auth, products, customers, orders, payments, delivery, dashboard, ai, staff
 
 # ── Logging ──────────────────────────────────────────
 logging.basicConfig(
@@ -33,7 +33,7 @@ app.add_middleware(
 )
 
 # ── Register routers under /api ──────────────────────
-for r in (auth, products, customers, orders, payments, delivery, dashboard, ai):
+for r in (auth, products, customers, orders, payments, delivery, dashboard, ai, staff):
     app.include_router(r.router, prefix="/api")
 
 # ── Startup ──────────────────────────────────────────
@@ -45,3 +45,7 @@ def startup():
 @app.get("/")
 def root():
     return {"message": "SupplyNest API is running", "docs": "/docs"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -21,6 +21,47 @@ class UserOut(BaseModel):
     id: int
     username: str
     role: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    status: str = "active"
+
+class StaffOut(BaseModel):
+    id: int
+    username: str
+    role: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    status: str = "active"
+
+class StaffCreate(BaseModel):
+    username: str
+    password: str
+    name: str
+    email: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    role: str = "staff"
+
+class StaffUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    status: Optional[str] = None
+    password: Optional[str] = None
+
+class StaffPerformanceOut(BaseModel):
+    staff_id: int
+    username: str
+    name: Optional[str]
+    total_orders: int
+    total_sales_amount: float
+    total_payments: int
+    last_updated: Optional[str]
 
 
 # ── Products ─────────────────────────────────────────

@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { getProducts, getCustomers, getOrders, getPayments, hasPermission, isAdmin } from '../store'
+import { useMemo, useState, useEffect } from 'react'
+import { getProducts, getCustomers, getOrders, getPayments, hasPermission, isAdmin, fetchAllPerformance } from '../store'
 
 export default function Dashboard({ currency, formatCurrency, auth }) {
     const products = getProducts()
@@ -8,6 +8,13 @@ export default function Dashboard({ currency, formatCurrency, auth }) {
     const payments = getPayments()
 
     const userIsAdmin = isAdmin()
+    const [performance, setPerformance] = useState([])
+
+    useEffect(() => {
+        if (userIsAdmin) {
+            fetchAllPerformance().then(setPerformance)
+        }
+    }, [userIsAdmin])
 
     const totalSales = orders.reduce((s, o) => s + (o.total || 0), 0)
     const totalCost = orders.reduce((s, o) => {
@@ -217,6 +224,28 @@ export default function Dashboard({ currency, formatCurrency, auth }) {
                     )}
                 </div>
             </div>
+
+            {/* Staff Performance — admin only */}
+            {userIsAdmin && performance.length > 0 && (
+                <div className="card" style={{ marginTop: 28 }}>
+                    <div className="card-title"><span className="icon">🏆</span> Staff Performance Leaderboard</div>
+                    <div className="performance-grid">
+                        {[...performance].sort((a,b) => b.total_sales_amount - a.total_sales_amount).map((p, i) => (
+                            <div key={p.staff_id} className="perf-item">
+                                <div className="perf-rank">#{i+1}</div>
+                                <div className="perf-info">
+                                    <div className="perf-name">{p.name || p.username}</div>
+                                    <div className="perf-stats">
+                                        <span>📦 {p.total_orders} Orders</span>
+                                        <span>💳 {p.total_payments} Pays</span>
+                                    </div>
+                                </div>
+                                <div className="perf-value">{formatCurrency(p.total_sales_amount)}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
