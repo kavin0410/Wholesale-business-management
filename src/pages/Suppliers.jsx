@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { getSuppliers, saveSuppliers, nextId, addNotification, hasPermission } from '../store'
+import { useState, useEffect } from 'react'
+import { fetchSuppliers, createSupplier, updateSupplierApi, deleteSupplierApi, addNotification, hasPermission } from '../store'
 
 export default function Suppliers({ showToast, refresh, auth }) {
-    const [suppliers, setSuppliers] = useState(getSuppliers())
+    const [suppliers, setSuppliers] = useState([])
+    const [loading, setLoading] = useState(true)
     const [editId, setEditId] = useState(null)
     const [form, setForm] = useState({ name: '', phone: '', email: '', address: '' })
 
@@ -16,34 +17,44 @@ export default function Suppliers({ showToast, refresh, auth }) {
         setEditId(null)
     }
 
-    const reload = () => { setSuppliers(getSuppliers()); refresh() }
+    const loadData = async () => {
+        setLoading(true)
+        const res = await fetchSuppliers()
+        setSuppliers(res.data)
+        setLoading(false)
+        refresh()
+    }
 
-    const handleSubmit = (e) => {
+    useEffect(() => {
+        loadData()
+    }, [])
+
+    const handleSubmit = async (e) => {
         e.preventDefault()
         if (editId && !canEdit) return showToast('⛔ You do not have permission to edit suppliers', 'error')
         if (!editId && !canCreate) return showToast('⛔ You do not have permission to add suppliers', 'error')
 
-        const data = getSuppliers()
+        let success = false
         if (editId) {
-            const idx = data.findIndex(s => s.id === editId)
-            if (idx >= 0) {
-                data[idx] = { ...data[idx], name: form.name, phone: form.phone, email: form.email, address: form.address }
-                saveSuppliers(data)
+            success = await updateSupplierApi(editId, form)
+            if (success) {
                 showToast('Supplier updated successfully', 'success')
                 addNotification(`Supplier "${form.name}" updated`, 'info')
             }
         } else {
-            const newSup = {
-                id: nextId(data), name: form.name, phone: form.phone,
-                email: form.email, address: form.address
+            success = await createSupplier(form)
+            if (success) {
+                showToast('Supplier added successfully', 'success')
+                addNotification(`New supplier "${form.name}" added`, 'info')
             }
-            data.push(newSup)
-            saveSuppliers(data)
-            showToast('Supplier added successfully', 'success')
-            addNotification(`New supplier "${form.name}" added`, 'info')
         }
-        resetForm()
-        reload()
+
+        if (success) {
+            resetForm()
+            loadData()
+        } else {
+            showToast('Failed to save supplier', 'error')
+        }
     }
 
     const handleEdit = (s) => {
@@ -52,13 +63,16 @@ export default function Suppliers({ showToast, refresh, auth }) {
         setForm({ name: s.name, phone: s.phone || '', email: s.email || '', address: s.address || '' })
     }
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (!canDelete) return showToast('⛔ You do not have permission to delete suppliers', 'error')
         if (!confirm('Delete this supplier?')) return
-        const data = getSuppliers().filter(s => s.id !== id)
-        saveSuppliers(data)
-        showToast('Supplier deleted', 'error')
-        reload()
+        const success = await deleteSupplierApi(id)
+        if (success) {
+            showToast('Supplier deleted', 'error')
+            loadData()
+        } else {
+            showToast('Failed to delete supplier', 'error')
+        }
     }
 
     return (

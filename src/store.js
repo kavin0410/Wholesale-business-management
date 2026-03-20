@@ -299,6 +299,96 @@ export async function fetchStaffPerformance(id) {
     }
 }
 
+/* Customers — Async API helpers */
+export async function fetchCustomers(page = 1, limit = 100) {
+    try {
+        const result = await api.get(`/customers?page=${page}&limit=${limit}`)
+        if (result.success) {
+            setData(STORE_KEYS.customers, result.data)
+            return { data: result.data, total: result.total }
+        }
+        return { data: [], total: 0 }
+    } catch (error) {
+        console.error('Failed to fetch customers:', error)
+        return { data: getCustomers(), total: getCustomers().length }
+    }
+}
+
+export async function createCustomer(customerData) {
+    try {
+        const result = await api.post('/customers', customerData)
+        return result.success
+    } catch (error) {
+        console.error('Failed to create customer:', error)
+        return false
+    }
+}
+
+export async function updateCustomerApi(id, customerData) {
+    try {
+        const result = await api.put(`/customers/${id}`, customerData)
+        return result.success
+    } catch (error) {
+        console.error('Failed to update customer:', error)
+        return false
+    }
+}
+
+export async function deleteCustomerApi(id) {
+    try {
+        const result = await api.delete(`/customers/${id}`)
+        return result.success
+    } catch (error) {
+        console.error('Failed to delete customer:', error)
+        return false
+    }
+}
+
+/* Suppliers — Async API helpers */
+export async function fetchSuppliers(page = 1, limit = 100) {
+    try {
+        const result = await api.get(`/suppliers?page=${page}&limit=${limit}`)
+        if (result.success) {
+            setData(STORE_KEYS.suppliers, result.data)
+            return { data: result.data, total: result.total }
+        }
+        return { data: [], total: 0 }
+    } catch (error) {
+        console.error('Failed to fetch suppliers:', error)
+        return { data: getSuppliers(), total: getSuppliers().length }
+    }
+}
+
+export async function createSupplier(supplierData) {
+    try {
+        const result = await api.post('/suppliers', supplierData)
+        return result.success
+    } catch (error) {
+        console.error('Failed to create supplier:', error)
+        return false
+    }
+}
+
+export async function updateSupplierApi(id, supplierData) {
+    try {
+        const result = await api.put(`/suppliers/${id}`, supplierData)
+        return result.success
+    } catch (error) {
+        console.error('Failed to update supplier:', error)
+        return false
+    }
+}
+
+export async function deleteSupplierApi(id) {
+    try {
+        const result = await api.delete(`/suppliers/${id}`)
+        return result.success
+    } catch (error) {
+        console.error('Failed to delete supplier:', error)
+        return false
+    }
+}
+
 /* Products — Local Storage (Legacy/Fallback) */
 export function getProducts() { return getData(STORE_KEYS.products) }
 export function saveProducts(data) { setData(STORE_KEYS.products, data) }

@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { getCustomers, saveCustomers, nextId, addNotification, hasPermission } from '../store'
+import { useState, useEffect } from 'react'
+import { fetchCustomers, createCustomer, updateCustomerApi, deleteCustomerApi, addNotification, hasPermission } from '../store'
 
 export default function Customers({ showToast, refresh, auth }) {
-    const [customers, setCustomers] = useState(getCustomers())
+    const [customers, setCustomers] = useState([])
+    const [loading, setLoading] = useState(true)
     const [editId, setEditId] = useState(null)
     const [form, setForm] = useState({ name: '', phone: '', email: '', address: '' })
 
@@ -12,29 +13,42 @@ export default function Customers({ showToast, refresh, auth }) {
     const canDelete = hasPermission('customers:delete')
 
     const resetForm = () => { setForm({ name: '', phone: '', email: '', address: '' }); setEditId(null) }
-    const reload = () => { setCustomers(getCustomers()); refresh() }
+    
+    const loadData = async () => {
+        setLoading(true)
+        const res = await fetchCustomers()
+        setCustomers(res.data)
+        setLoading(false)
+        refresh()
+    }
 
-    const handleSubmit = (e) => {
+    useEffect(() => {
+        loadData()
+    }, [])
+
+    const handleSubmit = async (e) => {
         e.preventDefault()
         if (editId && !canEdit) return showToast('⛔ You do not have permission to edit customers', 'error')
         if (!editId && !canCreate) return showToast('⛔ You do not have permission to add customers', 'error')
 
-        const data = getCustomers()
+        let success = false
         if (editId) {
-            const idx = data.findIndex(c => c.id === editId)
-            if (idx >= 0) {
-                data[idx] = { ...data[idx], ...form }
-                saveCustomers(data)
-                showToast('Customer updated', 'success')
-            }
+            success = await updateCustomerApi(editId, form)
+            if (success) showToast('Customer updated', 'success')
         } else {
-            data.push({ id: nextId(data), ...form })
-            saveCustomers(data)
-            showToast('Customer added', 'success')
-            addNotification(`New customer "${form.name}" added`, 'info')
+            success = await createCustomer(form)
+            if (success) {
+                showToast('Customer added', 'success')
+                addNotification(`New customer "${form.name}" added`, 'info')
+            }
         }
-        resetForm()
-        reload()
+
+        if (success) {
+            resetForm()
+            loadData()
+        } else {
+            showToast('Failed to save customer', 'error')
+        }
     }
 
     const handleEdit = (c) => {
@@ -43,12 +57,16 @@ export default function Customers({ showToast, refresh, auth }) {
         setForm({ name: c.name, phone: c.phone, email: c.email, address: c.address })
     }
 
-    const handleDelete = (id) => {
+    const handleDelete = async (id) => {
         if (!canDelete) return showToast('⛔ You do not have permission to delete customers', 'error')
         if (!confirm('Delete this customer?')) return
-        saveCustomers(getCustomers().filter(c => c.id !== id))
-        showToast('Customer deleted', 'error')
-        reload()
+        const success = await deleteCustomerApi(id)
+        if (success) {
+            showToast('Customer deleted', 'error')
+            loadData()
+        } else {
+            showToast('Failed to delete customer', 'error')
+        }
     }
 
     return (
