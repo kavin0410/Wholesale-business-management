@@ -16,10 +16,14 @@ export default function Customers({ showToast, refresh, auth }) {
     
     const loadData = async () => {
         setLoading(true)
-        const res = await fetchCustomers()
-        setCustomers(res.data)
-        setLoading(false)
-        refresh()
+        try {
+            const res = await fetchCustomers()
+            if (res) setCustomers(res.data)
+        } catch (err) {
+            console.error('Failed to load customers:', err)
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {

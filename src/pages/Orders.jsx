@@ -17,16 +17,20 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
 
     const loadPageData = async () => {
         setLoading(true)
-        const [ordersRes, prodsRes, custsRes] = await Promise.all([
-            fetchOrders(),
-            fetchProducts(),
-            fetchCustomers()
-        ])
-        setOrders(ordersRes.data)
-        setProducts(prodsRes.data)
-        setCustomers(custsRes.data)
-        setLoading(false)
-        refresh()
+        try {
+            const [ordersRes, prodsRes, custsRes] = await Promise.all([
+                fetchOrders(),
+                fetchProducts(),
+                fetchCustomers()
+            ])
+            if (ordersRes) setOrders(ordersRes.data)
+            if (prodsRes) setProducts(prodsRes.data)
+            if (custsRes) setCustomers(custsRes.data)
+        } catch (err) {
+            console.error('Failed to load page data:', err)
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {

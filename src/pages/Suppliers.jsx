@@ -19,10 +19,14 @@ export default function Suppliers({ showToast, refresh, auth }) {
 
     const loadData = async () => {
         setLoading(true)
-        const res = await fetchSuppliers()
-        setSuppliers(res.data)
-        setLoading(false)
-        refresh()
+        try {
+            const res = await fetchSuppliers()
+            if (res) setSuppliers(res.data)
+        } catch (err) {
+            console.error('Failed to load suppliers:', err)
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {

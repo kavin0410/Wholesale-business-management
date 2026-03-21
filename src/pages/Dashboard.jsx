@@ -1,65 +1,64 @@
 import { useMemo, useState, useEffect } from 'react'
-import { getProducts, getCustomers, getOrders, getPayments, hasPermission, isAdmin, fetchAllPerformance } from '../store'
+import { isAdmin, fetchAllPerformance, migrateLocalDataToBackend } from '../store'
+import { api } from '../utils/api'
 
-export default function Dashboard({ currency, formatCurrency, auth }) {
-    const products = getProducts()
-    const customers = getCustomers()
-    const orders = getOrders()
-    const payments = getPayments()
-
+export default function Dashboard({ currency, formatCurrency, auth, refresh, showToast }) {
     const userIsAdmin = isAdmin()
     const [performance, setPerformance] = useState([])
+    const [stats, setStats] = useState(null)
+    const [loading, setLoading] = useState(true)
+    const [migrating, setMigrating] = useState(false)
+
+    const loadData = async () => {
+        setLoading(true)
+        try {
+            const res = await api.get('/dashboard/stats')
+            if (res.success) setStats(res.data)
+            
+            if (userIsAdmin) {
+                const perf = await fetchAllPerformance()
+                setPerformance(perf)
+            }
+        } catch (err) {
+            console.error('Failed to load dashboard:', err)
+        } finally {
+            setLoading(false)
+        }
+    }
 
     useEffect(() => {
-        if (userIsAdmin) {
-            fetchAllPerformance().then(setPerformance)
-        }
+        loadData()
     }, [userIsAdmin])
 
-    const totalSales = orders.reduce((s, o) => s + (o.total || 0), 0)
-    const totalCost = orders.reduce((s, o) => {
-        const prod = products.find(p => p.id === o.productId)
-        return s + (prod ? prod.costPrice * o.quantity : 0)
-    }, 0)
-    const totalProfit = totalSales - totalCost
-    const profitMargin = totalSales > 0 ? ((totalProfit / totalSales) * 100).toFixed(1) : '0.0'
-    const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0)
-    const pendingAmt = totalSales - totalPaid
+    const handleMigrate = async () => {
+        if (!confirm('This will move your local browser data (products, customers, suppliers) to the permanent cloud database. Continue?')) return
+        setMigrating(true)
+        const success = await migrateLocalDataToBackend()
+        if (success) {
+            showToast('Migration successful! Your data is now in the backend.', 'success')
+            loadData()
+            refresh()
+        } else {
+            showToast('Migration failed. Some data might already exist or there was a connection error.', 'error')
+        }
+        setMigrating(false)
+    }
 
-    // Recent orders (last 5)
-    const recentOrders = useMemo(() => {
-        return [...orders].reverse().slice(0, 5)
-    }, [orders])
-
-    // Low stock alerts
-    const lowStock = useMemo(() => {
-        return products.filter(p => p.stock <= 10)
-    }, [products])
-
-    // Smart suggestions
-    const freqOrdered = useMemo(() => {
-        const counts = {}
-        orders.forEach(o => {
-            const p = products.find(pr => pr.id === o.productId)
-            if (p) counts[p.name] = (counts[p.name] || 0) + o.quantity
-        })
-        return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5)
-    }, [orders, products])
-
-    const restockItems = useMemo(() => {
-        return products.filter(p => p.stock <= 5).slice(0, 5)
-    }, [products])
+    if (loading) return <div className="page-enter"><div className="loading-state">Loading Store Insights...</div></div>
+    if (!stats) return <div className="page-enter">Failed to load stats.</div>
 
     return (
         <div className="page-enter">
             <div className="page-header">
-                <h1>Dashboard</h1>
-                <p>
-                    {userIsAdmin
-                        ? 'Overview of your wholesale business at a glance'
-                        : `Welcome, ${auth?.username || 'Staff'} — here's your quick overview`
-                    }
-                </p>
+                <div style={{ flex: 1 }}>
+                    <h1>Dashboard</h1>
+                    <p>{userIsAdmin ? 'Overview of your wholesale business' : `Welcome back, ${auth?.username}!`}</p>
+                </div>
+                {userIsAdmin && (
+                    <button className="btn btn-warning" onClick={handleMigrate} disabled={migrating}>
+                        {migrating ? 'Migrating...' : '🚀 Sync Local Data to Backend'}
+                    </button>
+                )}
             </div>
 
             {/* Stat Cards */}
@@ -67,111 +66,79 @@ export default function Dashboard({ currency, formatCurrency, auth }) {
                 <div className="stat-card">
                     <div className="stat-icon blue">📦</div>
                     <div className="stat-info">
-                        <h3>{products.length}</h3>
+                        <h3>{stats.total_products}</h3>
                         <p>Total Products</p>
-                        <span className="stat-growth up">↑ Active</span>
+                        <span className="stat-growth up">↑ Live</span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-icon green">👥</div>
                     <div className="stat-info">
-                        <h3>{customers.length}</h3>
+                        <h3>{stats.total_customers}</h3>
                         <p>Total Customers</p>
-                        <span className="stat-growth up">↑ Growing</span>
+                        <span className="stat-growth up">↑ Database</span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-icon orange">🛒</div>
                     <div className="stat-info">
-                        <h3>{orders.length}</h3>
+                        <h3>{stats.total_orders}</h3>
                         <p>Total Orders</p>
-                        <span className="stat-growth up">↑ {orders.length > 0 ? '+' + orders.length : '0'}</span>
+                        <span className="stat-growth up">↑ Volume</span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-icon purple">💰</div>
                     <div className="stat-info">
-                        <h3>{formatCurrency(totalSales)}</h3>
+                        <h3>{formatCurrency(stats.total_sales)}</h3>
                         <p>Total Sales</p>
                         <span className="stat-growth up">↑ Revenue</span>
                     </div>
                 </div>
-                {/* Net Profit — admin only */}
                 {userIsAdmin && (
                     <div className="stat-card">
                         <div className="stat-icon teal">📊</div>
                         <div className="stat-info">
-                            <h3>{formatCurrency(totalProfit)}</h3>
+                            <h3>{formatCurrency(stats.total_profit)}</h3>
                             <p>Net Profit</p>
-                            <span className={`stat-growth ${totalProfit >= 0 ? 'up' : 'down'}`}>
-                                {totalProfit >= 0 ? '↑' : '↓'} {profitMargin}%
-                            </span>
+                            <span className="stat-growth up">↑ {stats.profit_margin}% Margin</span>
                         </div>
                     </div>
                 )}
             </div>
-
-            {/* Profit Summary — admin only */}
-            {userIsAdmin && (
-                <div className="card">
-                    <div className="card-title"><span className="icon">💹</span> Profit Summary</div>
-                    <div className="profit-summary-grid">
-                        <div className="profit-metric">
-                            <h4>Total Revenue</h4>
-                            <div className="profit-value">{formatCurrency(totalSales)}</div>
-                        </div>
-                        <div className="profit-metric">
-                            <h4>Total Cost</h4>
-                            <div className="profit-value text-warning">{formatCurrency(totalCost)}</div>
-                        </div>
-                        <div className="profit-metric">
-                            <h4>Net Profit</h4>
-                            <div className="profit-value text-success">{formatCurrency(totalProfit)}</div>
-                        </div>
-                        <div className="profit-metric">
-                            <h4>Profit Margin</h4>
-                            <div className="profit-value text-info">{profitMargin}%</div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Quick Info */}
             <div className="quick-info-grid">
                 <div className="card" style={{ marginBottom: 0 }}>
                     <div className="card-title"><span className="icon">🕐</span> Recent Orders</div>
                     <ul className="recent-list">
-                        {recentOrders.length === 0 ? (
+                        {!stats.recent_orders?.length ? (
                             <li className="empty-state">
                                 <div className="empty-icon">📋</div>
                                 <p>No orders yet. Create your first order!</p>
                             </li>
                         ) : (
-                            recentOrders.map(o => {
-                                const prod = products.find(p => p.id === o.productId)
-                                const cust = customers.find(c => c.id === o.customerId)
-                                return (
-                                    <li key={o.id}>
-                                        <strong>#{o.id}</strong> — {cust?.name || 'Unknown'} ordered {prod?.name || 'Unknown'} × {o.quantity}
-                                        <span style={{ float: 'right', fontWeight: 700, color: 'var(--success)' }}>
-                                            {formatCurrency(o.total)}
-                                        </span>
-                                    </li>
-                                )
-                            })
+                            stats.recent_orders.map(o => (
+                                <li key={o.id}>
+                                    <strong>#{o.id}</strong> — {o.customer_name} ordered {o.product_name} × {o.quantity}
+                                    <span style={{ float: 'right', fontWeight: 700, color: 'var(--success)' }}>
+                                        {formatCurrency(o.total)}
+                                    </span>
+                                </li>
+                            ))
                         )}
                     </ul>
                 </div>
                 <div className="card" style={{ marginBottom: 0 }}>
                     <div className="card-title"><span className="icon">⭐</span> Low Stock Alerts</div>
                     <ul className="recent-list">
-                        {lowStock.length === 0 ? (
+                        {!stats.low_stock?.length ? (
                             <li className="empty-state">
                                 <div className="empty-icon">✅</div>
                                 <p>All products are well stocked.</p>
                             </li>
                         ) : (
-                            lowStock.map(p => (
+                            stats.low_stock.map(p => (
                                 <li key={p.id}>
                                     📦 <strong>{p.name}</strong>
                                     <span style={{ float: 'right', color: p.stock <= 5 ? 'var(--danger)' : 'var(--warning)', fontWeight: 700 }}>
@@ -184,46 +151,30 @@ export default function Dashboard({ currency, formatCurrency, auth }) {
                 </div>
             </div>
 
-            {/* Smart Suggestions */}
-            <div className="card" style={{ marginTop: 28 }}>
-                <div className="card-title"><span className="icon">🧠</span> Smart Suggestions</div>
-                <div className="suggestions-grid">
-                    <div className="suggestion-box">
-                        <h4>🔥 Frequently Ordered</h4>
-                        <ul>
-                            {freqOrdered.length === 0 ? (
-                                <li className="muted">No data yet</li>
-                            ) : (
-                                freqOrdered.map(([name, qty], i) => (
-                                    <li key={i}>{name} — <strong>{qty} units</strong></li>
-                                ))
-                            )}
-                        </ul>
-                    </div>
-                    <div className="suggestion-box">
-                        <h4>📦 Restock Recommendations</h4>
-                        <ul>
-                            {restockItems.length === 0 ? (
-                                <li className="muted">No data yet</li>
-                            ) : (
-                                restockItems.map(p => (
-                                    <li key={p.id}>{p.name} — <strong style={{ color: 'var(--danger)' }}>{p.stock} left</strong></li>
-                                ))
-                            )}
-                        </ul>
-                    </div>
-                    {/* Payment Status — admin only */}
-                    {userIsAdmin && (
-                        <div className="suggestion-box">
-                            <h4>💳 Payment Status</h4>
-                            <ul>
-                                <li>Received: <strong className="text-success">{formatCurrency(totalPaid)}</strong></li>
-                                <li>Pending: <strong className="text-warning">{formatCurrency(pendingAmt)}</strong></li>
-                            </ul>
+            {/* Financial Summary — admin only */}
+            {userIsAdmin && (
+                <div className="card" style={{ marginTop: 28 }}>
+                    <div className="card-title"><span className="icon">💹</span> Financial Overview</div>
+                    <div className="profit-summary-grid">
+                        <div className="profit-metric">
+                            <h4>Total Revenue</h4>
+                            <div className="profit-value">{formatCurrency(stats.total_sales)}</div>
                         </div>
-                    )}
+                        <div className="profit-metric">
+                            <h4>Total Cost</h4>
+                            <div className="profit-value text-warning">{formatCurrency(stats.total_cost || 0)}</div>
+                        </div>
+                        <div className="profit-metric">
+                            <h4>Total Paid</h4>
+                            <div className="profit-value text-success">{formatCurrency(stats.total_paid || 0)}</div>
+                        </div>
+                        <div className="profit-metric">
+                            <h4>Pending Amount</h4>
+                            <div className="profit-value text-danger">{formatCurrency(stats.pending_amount || 0)}</div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Staff Performance — admin only */}
             {userIsAdmin && performance.length > 0 && (

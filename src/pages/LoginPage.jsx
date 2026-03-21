@@ -75,10 +75,6 @@ export default function LoginPage({ onLogin }) {
                         {loading ? '⏳ Authenticating...' : '🔐 Sign In'}
                     </button>
 
-                    <div className="login-hint">
-                        <p>Admin: <strong>admin / admin123</strong></p>
-                        <p>Staff: <strong>staff / staff123</strong></p>
-                    </div>
                 </form>
             </div>
         </div>

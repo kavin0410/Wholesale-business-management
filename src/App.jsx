@@ -11,6 +11,8 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import DeliveryTracking from './pages/DeliveryTracking'
 import Suppliers from './pages/Suppliers'
+import { TwentyFirstToolbar } from '@21st-extension/toolbar-react'
+import { ReactPlugin } from '@21st-extension/react'
 import {
     login as loginFn,
     logout as logoutFn,
@@ -76,6 +78,7 @@ export default function App() {
     const fmtCurrency = useCallback((amount) => {
         return formatCurrencyFn(amount, currency)
     }, [currency])
+    const toolbarConfig = { plugins: [ReactPlugin] }
 
     // Page navigation with access control
     const handleNavigate = (page) => {
@@ -90,6 +93,7 @@ export default function App() {
     if (!auth) {
         return (
             <>
+                <TwentyFirstToolbar config={toolbarConfig} />
                 <LoginPage onLogin={handleLogin} />
                 <Toast toasts={toasts} />
             </>
@@ -121,6 +125,7 @@ export default function App() {
 
     return (
         <>
+            <TwentyFirstToolbar config={toolbarConfig} />
             <DynamicIsland
                 activePage={activePage}
                 onNavigate={handleNavigate}

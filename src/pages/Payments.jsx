@@ -30,7 +30,6 @@ export default function Payments({ showToast, formatCurrency, refresh, auth }) {
             showToast('Failed to load payment data', 'error')
         } finally {
             setLoading(false)
-            refresh()
         }
     }
 

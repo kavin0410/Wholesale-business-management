@@ -102,7 +102,8 @@ export async function login(username, password) {
             allowedPages 
         }
         
-        localStorage.setItem(STORE_KEYS.auth, JSON.stringify(auth))
+        localStorage.removeItem(STORE_KEYS.auth)
+        setData(STORE_KEYS.auth, auth)
         return auth
     } catch (error) {
         console.error('Login failed:', error)
@@ -530,6 +531,37 @@ export async function fetchReportCategoriesApi() {
     }
 }
 
+/* Delivery Tracking — Async API helpers */
+export async function fetchDeliveriesApi() {
+    try {
+        const result = await api.get('/delivery')
+        return result.success ? result.data : []
+    } catch (error) {
+        console.error('Failed to fetch deliveries:', error)
+        return []
+    }
+}
+
+export async function fetchDeliveryByIdApi(orderId) {
+    try {
+        const result = await api.get(`/delivery/${orderId}`)
+        return result.success ? result.data : null
+    } catch (error) {
+        console.error('Failed to fetch delivery detail:', error)
+        return null
+    }
+}
+
+export async function updateDeliveryStatusApi(deliveryId, status, note = '') {
+    try {
+        const result = await api.put(`/delivery/${deliveryId}/status`, { status, note })
+        return result.success
+    } catch (error) {
+        console.error('Failed to update delivery status:', error)
+        return false
+    }
+}
+
 /* Products — Local Storage (Legacy/Fallback) */
 export function getProducts() { return getData(STORE_KEYS.products) }
 export function saveProducts(data) { setData(STORE_KEYS.products, data) }
@@ -557,6 +589,34 @@ export function getSavedCurrency() {
 
 export function saveCurrency(c) {
     localStorage.setItem(STORE_KEYS.currency, c)
+}
+
+/* Migration Utility — Local Storage to Backend */
+export async function migrateLocalDataToBackend() {
+    try {
+        const products = getProducts()
+        const customers = getCustomers()
+        const suppliers = getSuppliers()
+        const orders = getOrders()
+
+        // Very basic migration — in a real app we'd do this in one bulk request
+        for (const p of products) {
+            await createProduct({ ...p, supplier_id: null }) // supplier_id might be different
+        }
+        for (const c of customers) {
+            await createCustomer(c)
+        }
+        for (const s of suppliers) {
+            await createSupplier(s)
+        }
+        // Orders are complex due to foreign keys, skipping for basic migration or can be added later
+        // if IDs match up.
+        
+        return true
+    } catch (err) {
+        console.error('Migration failed:', err)
+        return false
+    }
 }
 
 /* Backup/Restore */

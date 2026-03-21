@@ -85,8 +85,8 @@ def create_order(
     # If it's a prepaid order (Razorpay), also record the payment immediately
     if body.razorpay_id:
         conn.execute(
-            "INSERT INTO payments (order_id, customer_id, staff_id, amount, method, transaction_id, date) 
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            """INSERT INTO payments (order_id, customer_id, staff_id, amount, method, transaction_id, date) 
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (order_id, body.customer_id, user["id"], total, body.payment_method, body.razorpay_id, now)
         )
         conn.execute("""
