@@ -80,7 +80,7 @@ const ROLE_PERMISSIONS = {
 
 // Pages that each role can access
 const ROLE_PAGES = {
-    admin: ['dashboard', 'products', 'customers', 'suppliers', 'orders', 'reports', 'payments', 'delivery', 'settings'],
+    admin: ['dashboard', 'products', 'customers', 'staff', 'suppliers', 'orders', 'reports', 'payments', 'delivery', 'settings'],
     staff:  ['dashboard', 'products', 'customers', 'orders', 'delivery'],
 }
 

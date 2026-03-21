@@ -31,6 +31,7 @@ export default function DynamicIsland({
         { id: 'dashboard', emoji: '📊', label: 'Dashboard' },
         { id: 'products', emoji: '📦', label: 'Products' },
         { id: 'customers', emoji: '👥', label: 'Customers' },
+        { id: 'staff', emoji: '🧑‍💼', label: 'Staff' },
         { id: 'suppliers', emoji: '🏭', label: 'Suppliers' },
         { id: 'orders', emoji: '🛒', label: 'Orders' },
         { id: 'reports', emoji: '📈', label: 'Reports' },

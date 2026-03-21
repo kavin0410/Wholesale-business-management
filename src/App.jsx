@@ -11,6 +11,7 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import DeliveryTracking from './pages/DeliveryTracking'
 import Suppliers from './pages/Suppliers'
+import StaffManagement from './pages/StaffManagement'
 import { TwentyFirstToolbar } from '@21st-extension/toolbar-react'
 import { ReactPlugin } from '@21st-extension/react'
 import {
@@ -119,6 +120,7 @@ export default function App() {
             case 'settings': return <Settings key={refreshKey} {...commonProps} />
             case 'delivery': return <DeliveryTracking key={refreshKey} {...commonProps} />
             case 'suppliers': return <Suppliers key={refreshKey} {...commonProps} />
+            case 'staff': return <StaffManagement key={refreshKey} {...commonProps} />
             default: return <Dashboard key={refreshKey} {...commonProps} />
         }
     }

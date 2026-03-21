@@ -24,6 +24,15 @@ export default function LoginPage({ onLogin }) {
 
     return (
         <div className="login-page">
+            <video
+                className="login-bg-video"
+                autoPlay
+                loop
+                muted
+                playsInline
+            >
+                <source src="/assets/signin-bg.mp4.mp4" type="video/mp4" />
+            </video>
             <div className="login-card">
                 <div className="login-brand">
                     <div className="login-logo-container">
