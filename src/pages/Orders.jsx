@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { fetchOrders, createOrderApi, updateOrderStatusApi, deleteOrderApi, fetchProducts, fetchCustomers, createPaymentApi, addNotification, hasPermission } from '../store'
+import { fetchOrders, createOrderApi, updateOrderStatusApi, deleteOrderApi, fetchProducts, fetchCustomers, createPaymentApi, createCashfreeOrderApi, addNotification, hasPermission } from '../store'
 import { generateInvoice } from '../utils/exportUtils'
 
 export default function Orders({ showToast, formatCurrency, refresh, auth }) {
@@ -51,58 +51,42 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
         return { subtotal, discountAmt, total, discountPct }
     }, [form, products])
 
-    const handleRazorpay = (formData, prod, cust) => {
-        const options = {
-            key: "rzp_test_dummykey", 
-            amount: Math.round(calcResult.total * 100),
-            currency: "INR",
-            name: "SupplyNest Wholesale",
-            description: `Order for ${prod.name}`,
-            handler: async function (response) {
-                // Payment success
-                setSubmitting(true)
-                try {
-                    const orderPayload = {
-                        ...formData,
-                        razorpayId: response.razorpay_payment_id
-                    }
-                    const result = await createOrderApi(orderPayload)
-                    if (result.success) {
-                        showToast('Payment Successful! Order Placed.', 'success')
-                        addNotification(`Order #${result.data.id} Paid via Razorpay`, 'order')
-                        
-                        // Generate invoice (backend returns delivery info too)
-                        const orderDataForInvoice = {
-                            id: result.data.id,
-                            ...formData,
-                            total: calcResult.total,
-                            discountAmt: calcResult.discountAmt,
-                            date: new Date().toLocaleDateString(),
-                            razorpayId: response.razorpay_payment_id,
-                            staffName: auth?.username || '—'
-                        }
-                        generateInvoice(orderDataForInvoice, cust, prod)
-                        
-                        setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
-                        loadPageData()
-                    } else {
-                        showToast(result.message || 'Failed to finalize order', 'error')
-                    }
-                } catch (error) {
-                    showToast('Critical error finalizing order', 'error')
-                } finally {
-                    setSubmitting(false)
+    const handleCashfree = async (formData, prod, cust) => {
+        setSubmitting(true)
+        try {
+            // Create pending order first to get ID
+            const orderPayload = {
+                ...formData,
+                paymentMethod: 'Cashfree'
+            }
+            const result = await createOrderApi(orderPayload)
+            
+            if (result.success) {
+                const orderId = result.data.id;
+                
+                showToast('Order created, redirecting to Cashfree...', 'info');
+                
+                // Get Cashfree link
+                const cfResult = await createCashfreeOrderApi({
+                    orderId: orderId,
+                    amount: calcResult.total,
+                    customerName: cust.name,
+                    customerPhone: cust.phone || "9999999999"
+                })
+                
+                if (cfResult.success && cfResult.data && cfResult.data.payment_link) {
+                    window.location.href = cfResult.data.payment_link;
+                } else {
+                    showToast('Failed to generate payment link', 'error');
                 }
-            },
-            prefill: {
-                name: cust.name,
-                email: cust.email,
-                contact: cust.phone
-            },
-            theme: { color: "#3f51b5" }
+            } else {
+                showToast(result.message || 'Failed to initialize order', 'error')
+            }
+        } catch (error) {
+            showToast('Critical error initializing order', 'error')
+        } finally {
+            setSubmitting(false)
         }
-        const rzp = new window.Razorpay(options)
-        rzp.open()
     }
 
     const handleSubmit = async (e) => {
@@ -115,8 +99,8 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
         const qty = Number(form.quantity)
         if (qty > prod.stock) return showToast('Not enough stock!', 'error')
 
-        if (['UPI', 'QR Code', 'Debit Card', 'Credit Card'].includes(form.paymentMethod)) {
-            handleRazorpay(form, prod, cust)
+        if (form.paymentMethod === 'Cashfree') {
+            handleCashfree(form, prod, cust)
             return
         }
 
@@ -220,11 +204,8 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
                             <div className="form-group">
                                 <label>Payment Method</label>
                                 <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} required>
-                                    <option value="Cash">Cash</option>
-                                    <option value="UPI">UPI</option>
-                                    <option value="QR Code">QR Code</option>
-                                    <option value="Debit Card">Debit Card</option>
-                                    <option value="Credit Card">Credit Card</option>
+                                    <option value="Cash">Cash (Direct Offline)</option>
+                                    <option value="Cashfree">Cashfree (Cards, UPI, NetBanking)</option>
                                 </select>
                             </div>
                             <div className="form-group">

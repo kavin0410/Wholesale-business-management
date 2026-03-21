@@ -80,8 +80,8 @@ const ROLE_PERMISSIONS = {
 
 // Pages that each role can access
 const ROLE_PAGES = {
-    admin: ['dashboard', 'products', 'customers', 'staff', 'suppliers', 'orders', 'reports', 'payments', 'delivery', 'settings'],
-    staff:  ['dashboard', 'products', 'customers', 'orders', 'delivery'],
+    admin: ['dashboard', 'products', 'customers', 'staff', 'suppliers', 'orders', 'reports', 'payments', 'delivery', 'settings', 'payment-success'],
+    staff:  ['dashboard', 'products', 'customers', 'orders', 'delivery', 'payment-success'],
 }
 
 
@@ -442,6 +442,32 @@ export async function deleteOrderApi(id) {
     } catch (error) {
         console.error('Failed to delete order:', error)
         return false
+    }
+}
+
+export async function createCashfreeOrderApi(orderData) {
+    try {
+        const body = {
+            orderId: Number(orderData.orderId),
+            amount: Number(orderData.amount),
+            customerName: orderData.customerName || "Customer",
+            customerPhone: orderData.customerPhone || "9999999999"
+        }
+        const result = await api.post('/payments/create-order', body)
+        return result;
+    } catch (error) {
+        console.error('Failed to fetch cashfree link:', error)
+        return { success: false }
+    }
+}
+
+export async function verifyCashfreeOrderApi(orderId) {
+    try {
+        const result = await api.post('/payments/verify-cashfree', { orderId: Number(orderId) })
+        return result.success;
+    } catch (error) {
+        console.error('Failed to verify cashfree log:', error)
+        return false;
     }
 }
 
