@@ -37,10 +37,10 @@ export default function Reports({ formatCurrency, auth }) {
             ])
             if (summ) setSummary(summ)
             if (trend) setTrends(trend)
-            setCategories(cats)
-            setRawOrders(ords.data)
-            setRawCustomers(custs.data)
-            setRawProducts(prods.data)
+            setCategories(Array.isArray(cats) ? cats : [])
+            setRawOrders(ords?.data ?? [])
+            setRawCustomers(custs?.data ?? [])
+            setRawProducts(prods?.data ?? [])
         } catch (err) {
             console.error('Failed to load reports:', err)
         } finally {

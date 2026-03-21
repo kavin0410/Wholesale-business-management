@@ -200,7 +200,7 @@ export async function fetchProducts(page = 1, limit = 100) {
         return { data: [], total: 0 }
     } catch (error) {
         console.error('Failed to fetch products:', error)
-        return { data: getProducts(), total: getProducts().length } // Fallback to local
+        return { data: [], total: 0 }
     }
 }
 
@@ -245,7 +245,7 @@ export async function fetchStaffs(page = 1, limit = 20) {
         return { data: [], total: 0 }
     } catch (error) {
         console.error('Failed to fetch staff:', error)
-        return { data: getData(STORE_KEYS.staff), total: getData(STORE_KEYS.staff).length }
+        return { data: [], total: 0 }
     }
 }
 
@@ -311,7 +311,7 @@ export async function fetchCustomers(page = 1, limit = 100) {
         return { data: [], total: 0 }
     } catch (error) {
         console.error('Failed to fetch customers:', error)
-        return { data: getCustomers(), total: getCustomers().length }
+        return { data: [], total: 0 }
     }
 }
 
@@ -356,7 +356,7 @@ export async function fetchSuppliers(page = 1, limit = 100) {
         return { data: [], total: 0 }
     } catch (error) {
         console.error('Failed to fetch suppliers:', error)
-        return { data: getSuppliers(), total: getSuppliers().length }
+        return { data: [], total: 0 }
     }
 }
 
@@ -401,7 +401,7 @@ export async function fetchOrders(page = 1, limit = 100) {
         return { data: [], total: 0 }
     } catch (error) {
         console.error('Failed to fetch orders:', error)
-        return { data: getOrders(), total: getOrders().length }
+        return { data: [], total: 0 }
     }
 }
 
@@ -461,7 +461,7 @@ export async function fetchPayments(page = 1, limit = 100) {
         return { data: [], total: 0 }
     } catch (error) {
         console.error('Failed to fetch payments:', error)
-        return { data: getPayments(), total: getPayments().length }
+        return { data: [], total: 0 }
     }
 }
 

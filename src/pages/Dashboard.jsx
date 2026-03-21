@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { isAdmin, fetchAllPerformance, migrateLocalDataToBackend } from '../store'
+import { isAdmin, fetchAllPerformance } from '../store'
 import { api } from '../utils/api'
 
 export default function Dashboard({ currency, formatCurrency, auth, refresh, showToast }) {
@@ -7,7 +7,6 @@ export default function Dashboard({ currency, formatCurrency, auth, refresh, sho
     const [performance, setPerformance] = useState([])
     const [stats, setStats] = useState(null)
     const [loading, setLoading] = useState(true)
-    const [migrating, setMigrating] = useState(false)
 
     const loadData = async () => {
         setLoading(true)
@@ -30,20 +29,6 @@ export default function Dashboard({ currency, formatCurrency, auth, refresh, sho
         loadData()
     }, [userIsAdmin])
 
-    const handleMigrate = async () => {
-        if (!confirm('This will move your local browser data (products, customers, suppliers) to the permanent cloud database. Continue?')) return
-        setMigrating(true)
-        const success = await migrateLocalDataToBackend()
-        if (success) {
-            showToast('Migration successful! Your data is now in the backend.', 'success')
-            loadData()
-            refresh()
-        } else {
-            showToast('Migration failed. Some data might already exist or there was a connection error.', 'error')
-        }
-        setMigrating(false)
-    }
-
     if (loading) return <div className="page-enter"><div className="loading-state">Loading Store Insights...</div></div>
     if (!stats) return <div className="page-enter">Failed to load stats.</div>
 
@@ -54,11 +39,6 @@ export default function Dashboard({ currency, formatCurrency, auth, refresh, sho
                     <h1>Dashboard</h1>
                     <p>{userIsAdmin ? 'Overview of your wholesale business' : `Welcome back, ${auth?.username}!`}</p>
                 </div>
-                {userIsAdmin && (
-                    <button className="btn btn-warning" onClick={handleMigrate} disabled={migrating}>
-                        {migrating ? 'Migrating...' : '🚀 Sync Local Data to Backend'}
-                    </button>
-                )}
             </div>
 
             {/* Stat Cards */}

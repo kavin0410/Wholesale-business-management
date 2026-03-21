@@ -163,46 +163,19 @@ def init_db():
     );
     """)
 
-    # Seed default users
+    # Seed default admin user only
     now = datetime.now().isoformat()
-    for uname, pw, role in [("admin", "admin123", "admin"), ("staff", "staff123", "staff")]:
-        existing = cur.execute("SELECT id FROM users WHERE username=?", (uname,)).fetchone()
-        if not existing:
-            cur.execute("INSERT INTO users (username, password, role, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-                        (uname, _hash(pw), role, "active", now, now))
-            uid = cur.lastrowid
-            cur.execute("INSERT INTO staff_performance (staff_id, last_updated) VALUES (?,?)", (uid, now))
+    existing = cur.execute("SELECT id FROM users WHERE username=?", ("admin",)).fetchone()
+    if not existing:
+        cur.execute(
+            "INSERT INTO users (username, password, role, status, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+            ("admin", _hash("admin123"), "admin", "active", now, now),
+        )
+        uid = cur.lastrowid
+        cur.execute("INSERT INTO staff_performance (staff_id, last_updated) VALUES (?,?)", (uid, now))
 
     # Ensure all existing users have a performance record
     cur.execute("INSERT OR IGNORE INTO staff_performance (staff_id, last_updated) SELECT id, ? FROM users", (now,))
-
-    # Seed sample products
-    exists = cur.execute("SELECT id FROM products LIMIT 1").fetchone()
-    if not exists:
-        now = datetime.now().isoformat()
-        cur.executemany(
-            "INSERT INTO products (name, category, price, cost_price, stock, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-            [
-                ("MacBook Pro M2", "Electronics", 129000, 110000, 15, now, now),
-                ("iPhone 14 Pro", "Electronics", 98000, 85000, 22, now, now),
-                ("Wireless Mouse", "Accessories", 1200, 800, 45, now, now),
-                ("Mechanical Keyboard", "Accessories", 4500, 3200, 10, now, now),
-                ("Samsung 27\" Monitor", "Electronics", 18500, 15000, 5, now, now)
-            ]
-        )
-
-    # Seed sample customers
-    exists = cur.execute("SELECT id FROM customers LIMIT 1").fetchone()
-    if not exists:
-        now = datetime.now().isoformat()
-        cur.executemany(
-            "INSERT INTO customers (name, email, phone, address, created_at, updated_at) VALUES (?,?,?,?,?,?)",
-            [
-                ("Kavin", "kavin@example.com", "9876543210", "123, Anna Salai, Chennai", now, now),
-                ("John Doe", "john@gmail.com", "8877665544", "45, MG Road, Bangalore", now, now),
-                ("Alice Smith", "alice@corp.com", "7788990011", "12, Park Street, Kolkata", now, now)
-            ]
-        )
 
     conn.commit()
     conn.close()
