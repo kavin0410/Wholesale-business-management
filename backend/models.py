@@ -139,6 +139,7 @@ class OrderOut(BaseModel):
     product_name: Optional[str] = None
     payment_method: Optional[str] = "Cash"
     razorpay_id: Optional[str] = None
+    staff_name: Optional[str] = None
 
 
 # ── Payments ─────────────────────────────────────────

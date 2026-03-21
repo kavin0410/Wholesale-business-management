@@ -86,6 +86,47 @@ export async function generateBusinessReport(summary, trends, categories) {
     doc.save(`SupplyNest_Business_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
+// Generate Staff Performance PDF Report
+export function generateStaffPerformanceReport(staffs = [], performance = []) {
+    const jsPDF = window.jspdf.jsPDF;
+    const doc = new jsPDF();
+    const primaryColor = [63, 81, 181];
+
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text('SupplyNest Staff Performance Report', 20, 24);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(90, 90, 90);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 32);
+
+    const rows = staffs.map((s) => {
+        const p = performance.find((x) => x.staff_id === s.id) || {};
+        return [
+            s.name || '—',
+            s.username || '—',
+            s.email || '—',
+            (p.total_orders || 0).toString(),
+            `₹${Number(p.total_sales_amount || 0).toLocaleString()}`,
+            (p.total_payments || 0).toString(),
+            p.last_updated ? new Date(p.last_updated).toLocaleDateString() : '—'
+        ];
+    });
+
+    doc.autoTable({
+        startY: 40,
+        head: [['Staff Name', 'Username', 'Email', 'Orders', 'Sales', 'Payments', 'Last Updated']],
+        body: rows.length ? rows : [['—', '—', '—', '0', '₹0', '0', '—']],
+        theme: 'grid',
+        headStyles: { fillColor: primaryColor },
+        styles: { fontSize: 10, cellPadding: 3 }
+    });
+
+    doc.save(`SupplyNest_Staff_Performance_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
 // Generate Invoice PDF
 export async function generateInvoice(order, customer, product) {
     const jsPDF = window.jspdf.jsPDF;
@@ -157,12 +198,14 @@ export async function generateInvoice(order, customer, product) {
     doc.text('Invoice #', metaX, 80);
     doc.text('Invoice date', metaX, 88);
     doc.text('Payment mode', metaX, 96);
+    doc.text('Placed by', metaX, 104);
     
     doc.setFont("helvetica", "normal");
     doc.setTextColor(40, 40, 40);
     doc.text(order.id.toString().padStart(7, '0'), valueX, 80, { align: 'right' });
     doc.text(order.date, valueX, 88, { align: 'right' });
     doc.text(order.paymentMethod || 'Cash', valueX, 96, { align: 'right' });
+    doc.text(order.staffName || '—', valueX, 104, { align: 'right' });
     
     // --- 4. Items Table ---
     const tableData = [
@@ -176,7 +219,7 @@ export async function generateInvoice(order, customer, product) {
     ];
     
     doc.autoTable({
-        startY: 110,
+        startY: 116,
         head: [['QTY', 'Description', 'Unit Price', 'Discount', 'Amount']],
         body: [
             [

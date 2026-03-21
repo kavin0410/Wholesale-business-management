@@ -20,10 +20,11 @@ def list_orders(
     offset = (page - 1) * limit
     total = conn.execute("SELECT COUNT(*) FROM orders").fetchone()[0]
     rows = conn.execute("""
-        SELECT o.*, c.name AS customer_name, p.name AS product_name
+        SELECT o.*, c.name AS customer_name, p.name AS product_name, u.name AS staff_name
         FROM orders o
         JOIN customers c ON o.customer_id = c.id
         JOIN products p ON o.product_id = p.id
+        LEFT JOIN users u ON o.staff_id = u.id
         ORDER BY o.id DESC LIMIT ? OFFSET ?
     """, (limit, offset)).fetchall()
     conn.close()

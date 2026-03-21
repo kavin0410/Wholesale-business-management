@@ -78,7 +78,8 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
                             total: calcResult.total,
                             discountAmt: calcResult.discountAmt,
                             date: new Date().toLocaleDateString(),
-                            razorpayId: response.razorpay_payment_id
+                            razorpayId: response.razorpay_payment_id,
+                            staffName: auth?.username || '—'
                         }
                         generateInvoice(orderDataForInvoice, cust, prod)
                         
@@ -141,7 +142,8 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
                     ...form,
                     total: calcResult.total,
                     discountAmt: calcResult.discountAmt,
-                    date: new Date().toLocaleDateString()
+                    date: new Date().toLocaleDateString(),
+                    staffName: auth?.username || '—'
                 }
                 generateInvoice(orderDataForInvoice, cust, prod)
                 
@@ -256,11 +258,11 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
                 <div className="table-wrapper">
                     <table>
                         <thead>
-                            <tr><th>Order #</th><th>Date</th><th>Customer</th><th>Product</th><th>Qty</th><th>Discount</th><th>Total</th><th>Profit</th><th>Status</th><th>Actions</th></tr>
+                            <tr><th>Order #</th><th>Date</th><th>Customer</th><th>Product</th><th>Placed By</th><th>Qty</th><th>Discount</th><th>Total</th><th>Profit</th><th>Status</th><th>Actions</th></tr>
                         </thead>
                         <tbody>
                             {orders.length === 0 ? (
-                                <tr><td colSpan={10}><div className="empty-state"><div className="empty-icon">🛒</div><p>No orders placed yet.</p></div></td></tr>
+                                <tr><td colSpan={11}><div className="empty-state"><div className="empty-icon">🛒</div><p>No orders placed yet.</p></div></td></tr>
                             ) : [...orders].reverse().map(o => {
                                 const prod = products.find(p => p.id === o.productId)
                                 const cust = customers.find(c => c.id === o.customerId)
@@ -271,6 +273,7 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
                                         <td>{o.date}</td>
                                         <td>{cust?.name || '—'}</td>
                                         <td>{prod?.name || '—'}</td>
+                                        <td>{o.staffName || '—'}</td>
                                         <td>{o.quantity}</td>
                                         <td>{o.discount ? o.discount + '%' : '—'}</td>
                                         <td className="text-success"><strong>{formatCurrency(o.total)}</strong></td>

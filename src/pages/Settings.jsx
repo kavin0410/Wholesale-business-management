@@ -9,6 +9,7 @@ import {
     deleteStaff,
     fetchAllPerformance
 } from '../store'
+import { generateStaffPerformanceReport } from '../utils/exportUtils'
 
 export default function Settings({ showToast, refresh, auth }) {
     const fileRef = useRef(null)
@@ -143,6 +144,15 @@ export default function Settings({ showToast, refresh, auth }) {
 
                     <div className="card" style={{ marginTop: '24px' }}>
                         <div className="card-title"><span className="icon">📋</span> Staff List & Performance Summary</div>
+                        <div style={{ marginBottom: 14 }}>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => generateStaffPerformanceReport(staffs, performance)}
+                            >
+                                📄 Export Staff Performance PDF
+                            </button>
+                        </div>
                         <div className="table-wrapper">
                             <table>
                                 <thead>

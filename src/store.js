@@ -390,6 +390,7 @@ export async function fetchOrders(page = 1, limit = 100) {
                 ...o,
                 customerName: o.customer_name,
                 productName: o.product_name,
+                staffName: o.staff_name,
                 discountAmt: o.discount_amt,
                 paymentMethod: o.payment_method,
                 razorpayId: o.razorpay_id
