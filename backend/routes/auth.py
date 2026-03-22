@@ -18,7 +18,7 @@ def login(req: LoginRequest):
     conn = get_db()
     user = conn.execute(
         "SELECT id, username, role, password FROM users WHERE username=?",
-        (req.username.lower(),)
+        (req.username.strip().lower(),)
     ).fetchone()
     conn.close()
     if not user or user["password"] != _hash(req.password):

@@ -5,6 +5,11 @@ from models import ApiResponse
 from auth_middleware import require_permission, get_current_user
 from datetime import datetime
 import logging
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from services.email_service import send_dispatch_email
 
 logger = logging.getLogger("supplynest")
 router = APIRouter(prefix="/delivery", tags=["Delivery"])
@@ -56,10 +61,32 @@ def update_delivery_status(delivery_id: int, req: dict, user: dict = Depends(req
         conn.close()
         raise HTTPException(404, "Delivery not found")
         
+    old_status = delivery["status"]
+    order_id = delivery["order_id"]
     now = datetime.now().isoformat()
     conn.execute("UPDATE deliveries SET status = ?, updated_at = ? WHERE id = ?", (new_status, now, delivery_id))
     conn.execute("INSERT INTO delivery_timeline (delivery_id, status, timestamp, note) VALUES (?,?,?,?)",
                  (delivery_id, new_status, now, note))
+    
+    # Check if we should send an email notification
+    if new_status.lower() == "dispatched" and old_status.lower() != "dispatched":
+        customer = conn.execute("""
+            SELECT c.name, c.email, o.total, p.name as product_name
+            FROM orders o
+            JOIN customers c ON o.customer_id = c.id
+            JOIN products p ON o.product_id = p.id
+            WHERE o.id = ?
+        """, (order_id,)).fetchone()
+        
+        if customer and customer["email"]:
+            send_dispatch_email(
+                customer_name=customer["name"],
+                customer_email=customer["email"],
+                order_id=order_id,
+                product_name=customer["product_name"],
+                total=customer["total"]
+            )
+            
     conn.commit()
     conn.close()
     

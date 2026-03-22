@@ -88,7 +88,8 @@ const ROLE_PAGES = {
 
 export async function login(username, password) {
     try {
-        const result = await api.post('/auth/login', { username, password })
+        const cleanUsername = username.trim()
+        const result = await api.post('/auth/login', { username: cleanUsername, password })
         if (!result.success) return null
 
         const { id, role, permissions } = result.data
@@ -96,7 +97,7 @@ export async function login(username, password) {
         
         const auth = { 
             id,
-            username: username.toLowerCase(), 
+            username: cleanUsername.toLowerCase(), 
             role, 
             permissions, 
             allowedPages 
@@ -107,7 +108,7 @@ export async function login(username, password) {
         return auth
     } catch (error) {
         console.error('Login failed:', error)
-        return null
+        throw error
     }
 }
 
