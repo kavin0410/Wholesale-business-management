@@ -156,11 +156,8 @@ export async function generateInvoice(order, customer, product) {
     
     // Right: Logo
     if (logoBase64) {
-        // Logo in a box like the template
-        doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        doc.setLineWidth(0.1);
-        doc.rect(140, 15, 50, 25);
-        doc.addImage(logoBase64, 'PNG', 152, 17, 25, 21);
+        // Enlarge logo and remove the border box
+        doc.addImage(logoBase64, 'PNG', 145, 12, 45, 38);
     }
     
     // --- 2. Title Section ---
@@ -208,24 +205,17 @@ export async function generateInvoice(order, customer, product) {
     doc.text(order.staffName || '—', valueX, 104, { align: 'right' });
     
     // --- 4. Items Table ---
-    const tableData = [
-        [
-            '1.00',
-            product?.name || 'General Product',
-            order.quantity.toString(),
-            `₹${product?.price?.toLocaleString() || 0}`,
-            `₹${order.total?.toLocaleString() || 0}`
-        ]
-    ];
+    const unitPrice = product?.price || 0;
+    const qty = order.quantity || 1;
     
     doc.autoTable({
         startY: 116,
         head: [['QTY', 'Description', 'Unit Price', 'Discount', 'Amount']],
         body: [
             [
-                order.quantity.toFixed(2),
-                product?.name || 'Product',
-                product?.price?.toFixed(2) || '0.00',
+                qty.toFixed(2),
+                product?.name || order.productName || 'Product',
+                unitPrice.toFixed(2),
                 `${order.discount}%`,
                 `₹${order.total?.toLocaleString() || 0}`
             ]
@@ -260,8 +250,10 @@ export async function generateInvoice(order, customer, product) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(40, 40, 40);
     
+    const subtotal = unitPrice * qty;
+    
     doc.text('Subtotal', summaryX, currentY);
-    doc.text(`₹${(product?.price * order.quantity).toLocaleString()}`, summaryValX, currentY, { align: 'right' });
+    doc.text(`₹${(subtotal || 0).toLocaleString()}`, summaryValX, currentY, { align: 'right' });
     
     currentY += 8;
     doc.text(`Discount (${order.discount}%)`, summaryX, currentY);
@@ -275,7 +267,7 @@ export async function generateInvoice(order, customer, product) {
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.setFontSize(12);
     doc.text('Total (INR)', summaryX, currentY);
-    doc.text(`₹${order.total?.toLocaleString()}`, summaryValX, currentY, { align: 'right' });
+    doc.text(`₹${(order.total || 0).toLocaleString()}`, summaryValX, currentY, { align: 'right' });
     
     // Bottom border for total like in template
     doc.setLineWidth(1);

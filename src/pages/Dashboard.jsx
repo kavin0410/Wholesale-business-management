@@ -5,14 +5,20 @@ import { api } from '../utils/api'
 export default function Dashboard({ currency, formatCurrency, auth, refresh, showToast }) {
     const userIsAdmin = isAdmin()
     const [performance, setPerformance] = useState([])
+    const [error, setError] = useState(null)
     const [stats, setStats] = useState(null)
     const [loading, setLoading] = useState(true)
 
     const loadData = async () => {
         setLoading(true)
+        setError(null)
         try {
             const res = await api.get('/dashboard/stats')
-            if (res.success) setStats(res.data)
+            if (res.success) {
+                setStats(res.data)
+            } else {
+                setError(res.message || 'Failed to retrieve statistics from server.')
+            }
             
             if (userIsAdmin) {
                 const perf = await fetchAllPerformance()
@@ -20,6 +26,7 @@ export default function Dashboard({ currency, formatCurrency, auth, refresh, sho
             }
         } catch (err) {
             console.error('Failed to load dashboard:', err)
+            setError(err.message || 'Could not connect to the backend server. Please ensure the backend is running.')
         } finally {
             setLoading(false)
         }
@@ -30,7 +37,22 @@ export default function Dashboard({ currency, formatCurrency, auth, refresh, sho
     }, [userIsAdmin])
 
     if (loading) return <div className="page-enter"><div className="loading-state">Loading Store Insights...</div></div>
-    if (!stats) return <div className="page-enter">Failed to load stats.</div>
+    
+    if (error || !stats) return (
+        <div className="page-enter">
+            <div className="error-state">
+                <div className="error-icon">⚠️</div>
+                <h2>Dashboard Error</h2>
+                <p>{error || 'Failed to load stats.'}</p>
+                <button className="btn btn-primary" onClick={loadData} style={{ marginTop: 16 }}>
+                    🔄 Retry Loading
+                </button>
+                <p style={{ marginTop: 24, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                    Tip: Make sure the backend (FastAPI) is running on port 8000.
+                </p>
+            </div>
+        </div>
+    )
 
     return (
         <div className="page-enter">

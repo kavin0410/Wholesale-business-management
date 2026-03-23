@@ -389,6 +389,8 @@ export async function fetchOrders(page = 1, limit = 100) {
             // Map snake_case to camelCase where needed for UI compatibility
             const mapped = result.data.map(o => ({
                 ...o,
+                productId: o.product_id,
+                customerId: o.customer_id,
                 customerName: o.customer_name,
                 productName: o.product_name,
                 staffName: o.staff_name,
