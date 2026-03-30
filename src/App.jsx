@@ -12,7 +12,7 @@ import Settings from './pages/Settings'
 import DeliveryTracking from './pages/DeliveryTracking'
 import Suppliers from './pages/Suppliers'
 import StaffManagement from './pages/StaffManagement'
-import PaymentSuccess from './pages/PaymentSuccess'
+
 import { TwentyFirstToolbar } from '@21st-extension/toolbar-react'
 import { ReactPlugin } from '@21st-extension/react'
 import {
@@ -32,10 +32,7 @@ import { useToast } from './hooks/useToast'
 
 export default function App() {
     const [auth, setAuth] = useState(getAuth())
-    const [activePage, setActivePage] = useState(() => {
-        if (window.location.pathname.includes('/payment-success')) return 'payment-success';
-        return 'dashboard';
-    })
+    const [activePage, setActivePage] = useState('dashboard')
     const [currency, setCurrency] = useState(getSavedCurrency())
     const [notifications, setNotifications] = useState(getNotifications())
     const [refreshKey, setRefreshKey] = useState(0)
@@ -125,7 +122,7 @@ export default function App() {
             case 'delivery': return <DeliveryTracking key={refreshKey} {...commonProps} />
             case 'suppliers': return <Suppliers key={refreshKey} {...commonProps} />
             case 'staff': return <StaffManagement key={refreshKey} {...commonProps} />
-            case 'payment-success': return <PaymentSuccess key={refreshKey} {...commonProps} />
+
             default: return <Dashboard key={refreshKey} {...commonProps} />
         }
     }

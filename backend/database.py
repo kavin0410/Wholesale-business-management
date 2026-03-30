@@ -4,7 +4,11 @@ SQLite database setup — tables, connection helpers, seed data.
 import sqlite3, os, hashlib, logging
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "supplynest.db")
+# Vercel fix: Use /tmp/ directory because it's the only writable folder in Serverless Functions
+if os.getenv("VERCEL"):
+    DB_PATH = "/tmp/supplynest.db"
+else:
+    DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "supplynest.db"))
 logger = logging.getLogger("supplynest")
 
 
@@ -96,7 +100,7 @@ def init_db():
         profit      REAL DEFAULT 0,
         status      TEXT NOT NULL DEFAULT 'Pending',
         payment_method TEXT DEFAULT 'Cash',
-        razorpay_id  TEXT,
+
         date        TEXT NOT NULL,
         FOREIGN KEY (customer_id) REFERENCES customers(id),
         FOREIGN KEY (product_id) REFERENCES products(id),

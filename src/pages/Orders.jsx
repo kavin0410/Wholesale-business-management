@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
-import { fetchOrders, createOrderApi, updateOrderStatusApi, deleteOrderApi, fetchProducts, fetchCustomers, createPaymentApi, createCashfreeOrderApi, addNotification, hasPermission } from '../store'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { fetchOrders, createOrderApi, updateOrderStatusApi, deleteOrderApi, fetchProducts, fetchCustomers, createPaymentApi, addNotification, hasPermission } from '../store'
 import { generateInvoice } from '../utils/exportUtils'
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js'
 
 export default function Orders({ showToast, formatCurrency, refresh, auth }) {
     const [orders, setOrders] = useState([])
@@ -9,6 +10,7 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [form, setForm] = useState({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' })
+    const pendingOrderId = useRef(null)
 
     // RBAC checks
     const canCreate = hasPermission('orders:create')
@@ -51,43 +53,7 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
         return { subtotal, discountAmt, total, discountPct }
     }, [form, products])
 
-    const handleCashfree = async (formData, prod, cust) => {
-        setSubmitting(true)
-        try {
-            // Create pending order first to get ID
-            const orderPayload = {
-                ...formData,
-                paymentMethod: 'Cashfree'
-            }
-            const result = await createOrderApi(orderPayload)
-            
-            if (result.success) {
-                const orderId = result.data.id;
-                
-                showToast('Order created, redirecting to Cashfree...', 'info');
-                
-                // Get Cashfree link
-                const cfResult = await createCashfreeOrderApi({
-                    orderId: orderId,
-                    amount: calcResult.total,
-                    customerName: cust.name,
-                    customerPhone: cust.phone || "9999999999"
-                })
-                
-                if (cfResult.success && cfResult.data && cfResult.data.payment_link) {
-                    window.location.href = cfResult.data.payment_link;
-                } else {
-                    showToast('Failed to generate payment link', 'error');
-                }
-            } else {
-                showToast(result.message || 'Failed to initialize order', 'error')
-            }
-        } catch (error) {
-            showToast('Critical error initializing order', 'error')
-        } finally {
-            setSubmitting(false)
-        }
-    }
+
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -99,10 +65,7 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
         const qty = Number(form.quantity)
         if (qty > prod.stock) return showToast('Not enough stock!', 'error')
 
-        if (form.paymentMethod === 'Cashfree') {
-            handleCashfree(form, prod, cust)
-            return
-        }
+
 
         // Cash payment
         setSubmitting(true)
@@ -111,12 +74,14 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
             if (result.success) {
                 const orderId = result.data.id
                 
-                // Record cash payment
-                await createPaymentApi({
-                    orderId: orderId,
-                    amount: calcResult.total,
-                    method: 'Cash'
-                })
+                // If Cash, auto-record the payment immediately
+                if (form.paymentMethod === 'Cash') {
+                    await createPaymentApi({
+                        orderId: orderId,
+                        amount: calcResult.total,
+                        method: 'Cash'
+                    })
+                }
 
                 showToast('Order placed successfully!', 'success')
                 addNotification(`Order #${orderId}: ${cust.name} ordered ${prod.name} ×${qty}`, 'order')
@@ -205,7 +170,7 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
                                 <label>Payment Method</label>
                                 <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} required>
                                     <option value="Cash">Cash (Direct Offline)</option>
-                                    <option value="Cashfree">Cashfree (Cards, UPI, NetBanking)</option>
+                                    <option value="PayPal">PayPal (Online)</option>
                                 </select>
                             </div>
                             <div className="form-group">
@@ -227,9 +192,61 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
                                 <input type="text" value={calcResult.total ? formatCurrency(calcResult.total) : '—'} readOnly style={{ fontWeight: 700, fontSize: 16 }} />
                             </div>
                         </div>
-                        <button type="submit" className="btn btn-primary">
-                            {['Cash'].includes(form.paymentMethod) ? '🛒 Place Order' : '💳 Proceed to Pay'}
-                        </button>
+                        {form.paymentMethod === 'PayPal' ? (
+                            <div style={{ marginTop: '20px', maxWidth: '400px' }}>
+                                <PayPalScriptProvider options={{ "client-id": "AdTxu8LGaZsrg-u6u9wPgAHLs-H8jkqJ9dFQcAXAM6tKkKU2Ds6HSpp2Gqe379kQ2sRC3hD4_SOBdV5z", currency: "USD" }}>
+                                    <PayPalButtons
+                                        disabled={!form.customerId || !form.productId || Number(form.quantity) <= 0 || !calcResult.total}
+                                        createOrder={async () => {
+                                            const prod = products.find(p => p.id === Number(form.productId))
+                                            const qty = Number(form.quantity)
+                                            if (qty > (prod?.stock || 0)) { showToast('Not enough stock!', 'error'); throw new Error(); }
+
+                                            // 1. Create DB Order First
+                                            const result = await createOrderApi(form)
+                                            if (!result.success) { showToast(result.message || 'Failed to place order', 'error'); throw new Error(); }
+                                            pendingOrderId.current = result.data.id
+
+                                            // 2. Create PayPal Order
+                                            const res = await fetch("http://localhost:4000/api/paypal/create-order", {
+                                                method: "POST", headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ amount: calcResult.total })
+                                            });
+                                            const data = await res.json();
+                                            if (data.error) { showToast(data.error, "error"); throw new Error(); }
+                                            return data.orderID;
+                                        }}
+                                        onApprove={async (data, actions) => {
+                                            const res = await fetch("http://localhost:4000/api/paypal/capture-order", {
+                                                method: "POST", headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ orderID: data.orderID })
+                                            });
+                                            const captureData = await res.json();
+                                            if (captureData.status === "COMPLETED") {
+                                                const oId = pendingOrderId.current;
+                                                await createPaymentApi({ orderId: oId, amount: calcResult.total, method: "PayPal" });
+                                                await updateOrderStatusApi(oId, "Paid");
+                                                
+                                                showToast("Payment Successful! Order Placed.", "success");
+                                                setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' });
+                                                
+                                                const cust = customers.find(c => c.id === Number(form.customerId))
+                                                const prod = products.find(p => p.id === Number(form.productId))
+                                                addNotification(`Order #${oId}: Paid online via PayPal`, 'order');
+                                                generateInvoice({ id: oId, ...form, total: calcResult.total, discountAmt: calcResult.discountAmt, date: new Date().toLocaleDateString(), staffName: auth?.username || '—' }, cust, prod);
+                                                
+                                                loadPageData();
+                                            } else {
+                                                showToast("Payment failed", "error");
+                                            }
+                                        }}
+                                        onError={(err) => showToast("PayPal Error. Backend running?", "error")}
+                                    />
+                                </PayPalScriptProvider>
+                            </div>
+                        ) : (
+                            <button type="submit" className="btn btn-primary">🛒 Place Order</button>
+                        )}
                     </form>
                 </div>
             )}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { fetchPayments, createPaymentApi, fetchPaymentSummaryApi, fetchOrders, fetchCustomers, addNotification, hasPermission } from '../store'
+import { fetchPayments, createPaymentApi, fetchPaymentSummaryApi, fetchOrders, fetchCustomers, addNotification, hasPermission, updateOrderStatusApi } from '../store'
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js'
 
 export default function Payments({ showToast, formatCurrency, refresh, auth }) {
     const [payments, setPayments] = useState([])
@@ -119,10 +120,62 @@ export default function Payments({ showToast, formatCurrency, refresh, auth }) {
                                     <option value="UPI">UPI</option>
                                     <option value="Cheque">Cheque</option>
                                     <option value="Credit">Credit</option>
+                                    <option value="PayPal">PayPal (Online)</option>
                                 </select>
                             </div>
                         </div>
-                        <button type="submit" className="btn btn-success">💳 Record Payment</button>
+
+                        {form.method === 'PayPal' ? (
+                            <div style={{ marginTop: '20px', maxWidth: '400px' }}>
+                                <PayPalScriptProvider options={{ "client-id": "AdTxu8LGaZsrg-u6u9wPgAHLs-H8jkqJ9dFQcAXAM6tKkKU2Ds6HSpp2Gqe379kQ2sRC3hD4_SOBdV5z", currency: "USD" }}>
+                                    <PayPalButtons
+                                        disabled={!form.orderId || !form.amount || Number(form.amount) <= 0}
+                                        createOrder={async () => {
+                                            const res = await fetch("http://localhost:4000/api/paypal/create-order", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ amount: form.amount })
+                                            });
+                                            const data = await res.json();
+                                            if (data.error) {
+                                              showToast(data.error, "error");
+                                              throw new Error(data.error);
+                                            }
+                                            return data.orderID;
+                                        }}
+                                        onApprove={async (data, actions) => {
+                                            const res = await fetch("http://localhost:4000/api/paypal/capture-order", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ orderID: data.orderID })
+                                            });
+                                            const captureData = await res.json();
+                                            if (captureData.status === "COMPLETED") {
+                                                // Record payment in your local database
+                                                await createPaymentApi({
+                                                    orderId: Number(form.orderId),
+                                                    amount: form.amount,
+                                                    method: "PayPal"
+                                                });
+                                                // Update order status to PAID
+                                                await updateOrderStatusApi(Number(form.orderId), "Paid");
+                                                
+                                                showToast("Payment Successful", "success");
+                                                setForm({ orderId: '', amount: '', method: '' });
+                                                loadData();
+                                            } else {
+                                                showToast("Payment failed", "error");
+                                            }
+                                        }}
+                                        onError={(err) => {
+                                            showToast("PayPal Error. Is the backend running?", "error");
+                                        }}
+                                    />
+                                </PayPalScriptProvider>
+                            </div>
+                        ) : (
+                            <button type="submit" className="btn btn-success">💳 Record Payment</button>
+                        )}
                     </form>
                 </div>
             )}

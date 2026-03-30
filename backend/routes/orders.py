@@ -67,7 +67,7 @@ def create_order(
         """INSERT INTO orders (customer_id,product_id,staff_id,quantity,discount,discount_amt,total,profit,status,payment_method,razorpay_id,date)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
         (body.customer_id, body.product_id, user["id"], body.quantity, discount_pct, discount_amt, total, profit, 
-         "Paid" if body.razorpay_id else "Pending", body.payment_method, body.razorpay_id, now)
+         "Paid" if getattr(body, 'razorpay_id', None) else "Pending", body.payment_method, getattr(body, 'razorpay_id', None), now)
     )
     order_id = cur.lastrowid
 
@@ -84,11 +84,11 @@ def create_order(
     """, (total, datetime.now().isoformat(), user["id"]))
 
     # If it's a prepaid order (Razorpay), also record the payment immediately
-    if body.razorpay_id:
+    if getattr(body, 'razorpay_id', None):
         conn.execute(
             """INSERT INTO payments (order_id, customer_id, staff_id, amount, method, transaction_id, date) 
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (order_id, body.customer_id, user["id"], total, body.payment_method, body.razorpay_id, now)
+            (order_id, body.customer_id, user["id"], total, body.payment_method, getattr(body, 'razorpay_id', None), now)
         )
         conn.execute("""
             UPDATE staff_performance SET total_payments = total_payments + 1 WHERE staff_id = ?
@@ -125,7 +125,7 @@ def update_order_status(
     status: str = Query(...),
     user: dict = Depends(require_permission("orders:edit")),
 ):
-    valid = ("Pending", "Delivered", "Cancelled")
+    valid = ("Pending", "Paid", "Delivered", "Cancelled")
     if status not in valid:
         raise HTTPException(400, f"Status must be one of {valid}")
     conn = get_db()

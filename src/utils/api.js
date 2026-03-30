@@ -1,4 +1,7 @@
-const BASE_URL = 'http://localhost:8000/api'
+// Use relative path '/' in production, and localhost:8000 for local dev
+const BASE_URL = import.meta.env.MODE === 'production' 
+    ? '/api' 
+    : 'http://localhost:8000/api'
 
 /**
  * Common fetch utility with error handling and headers for SupplyNest.
@@ -27,8 +30,15 @@ async function apiRequest(endpoint, options = {}) {
 
     try {
         const response = await fetch(`${BASE_URL}${endpoint}`, config)
-        const result = await response.json()
+        
+        // Handle non-JSON responses gracefully (e.g. server crashes)
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const text = await response.text();
+            throw new Error(text || `Server returned non-JSON response (${response.status})`);
+        }
 
+        const result = await response.json()
         if (!response.ok) {
             throw new Error(result.detail || result.message || 'Something went wrong')
         }
