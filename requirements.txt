@@ -4,4 +4,4 @@ pydantic
 aiofiles
 python-multipart
 python-dotenv
-
+requests
