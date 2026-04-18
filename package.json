@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev:frontend": "vite",
-    "dev:backend": "cd backend && python -m uvicorn main:app --reload --port 8000",
-    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:backend-python": "cd backend && python -m uvicorn main:app --reload --port 8000",
+    "dev:backend-paypal": "cd paypal-backend && npm run dev",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend-python\" \"npm run dev:backend-paypal\"",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -22,10 +23,12 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.2.1",
     "concurrently": "^9.2.1",
+    "tailwindcss": "^4.2.2",
     "vite": "^5.4.2"
   },
   "description": "Wholesale Business Management System with PayPal Integration",

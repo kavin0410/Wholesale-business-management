@@ -115,6 +115,7 @@ def init_db():
         amount      REAL NOT NULL,
         method      TEXT NOT NULL,
         transaction_id TEXT,
+        status      TEXT DEFAULT 'PAID',
         date        TEXT NOT NULL,
         FOREIGN KEY (order_id) REFERENCES orders(id),
         FOREIGN KEY (customer_id) REFERENCES customers(id),
@@ -143,6 +144,10 @@ def init_db():
 
     try:
         cur.execute("ALTER TABLE payments ADD COLUMN transaction_id TEXT")
+    except: pass
+
+    try:
+        cur.execute("ALTER TABLE payments ADD COLUMN status TEXT DEFAULT 'PAID'")
     except: pass
 
     cur.executescript("""

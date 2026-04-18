@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { fetchOrders, createOrderApi, updateOrderStatusApi, deleteOrderApi, fetchProducts, fetchCustomers, createPaymentApi, addNotification, hasPermission } from '../store'
 import { generateInvoice } from '../utils/exportUtils'
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js'
+import { PAYPAL_BASE_URL } from '../utils/api'
 
 export default function Orders({ showToast, formatCurrency, refresh, auth }) {
     const [orders, setOrders] = useState([])
@@ -200,47 +201,67 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
                                         createOrder={async () => {
                                             const prod = products.find(p => p.id === Number(form.productId))
                                             const qty = Number(form.quantity)
-                                            if (qty > (prod?.stock || 0)) { showToast('Not enough stock!', 'error'); throw new Error(); }
+                                            if (qty > (prod?.stock || 0)) {
+                                                showToast('Not enough stock!', 'error')
+                                                throw new Error('Insufficient stock')
+                                            }
 
-                                            // 1. Create DB Order First
+                                            // 1. Create DB Order First (Python Backend)
                                             const result = await createOrderApi(form)
-                                            if (!result.success) { showToast(result.message || 'Failed to place order', 'error'); throw new Error(); }
+                                            if (!result.success) {
+                                                showToast(result.message || 'Failed to place order in DB', 'error')
+                                                throw new Error('DB Order Creation Failed')
+                                            }
                                             pendingOrderId.current = result.data.id
 
-                                            // 2. Create PayPal Order
-                                            const res = await fetch("http://localhost:4000/api/paypal/create-order", {
-                                                method: "POST", headers: { "Content-Type": "application/json" },
+                                            // 2. Create PayPal Order (Node Backend at :5000)
+                                            console.log("DEBUG: Calling PayPal backend for order creation...");
+                                            const res = await fetch(`${PAYPAL_BASE_URL}/create-order`, {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
                                                 body: JSON.stringify({ amount: calcResult.total })
                                             });
                                             const data = await res.json();
-                                            if (data.error) { showToast(data.error, "error"); throw new Error(); }
-                                            return data.orderID;
+                                            if (data.error) {
+                                                showToast(data.error, "error")
+                                                throw new Error(data.error)
+                                            }
+                                            return data.id;
                                         }}
                                         onApprove={async (data, actions) => {
-                                            const res = await fetch("http://localhost:4000/api/paypal/capture-order", {
-                                                method: "POST", headers: { "Content-Type": "application/json" },
-                                                body: JSON.stringify({ orderID: data.orderID })
-                                            });
-                                            const captureData = await res.json();
-                                            if (captureData.status === "COMPLETED") {
-                                                const oId = pendingOrderId.current;
-                                                await createPaymentApi({ orderId: oId, amount: calcResult.total, method: "PayPal" });
-                                                await updateOrderStatusApi(oId, "Paid");
+                                            console.log("DEBUG: Calling PayPal backend for payment capture...");
+                                            try {
+                                                const res = await fetch(`${PAYPAL_BASE_URL}/capture-order`, {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ 
+                                                        orderId: data.orderID,
+                                                        dbOrderId: pendingOrderId.current 
+                                                    })
+                                                });
+                                                const captureData = await res.json();
                                                 
-                                                showToast("Payment Successful! Order Placed.", "success");
-                                                setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' });
-                                                
-                                                const cust = customers.find(c => c.id === Number(form.customerId))
-                                                const prod = products.find(p => p.id === Number(form.productId))
-                                                addNotification(`Order #${oId}: Paid online via PayPal`, 'order');
-                                                generateInvoice({ id: oId, ...form, total: calcResult.total, discountAmt: calcResult.discountAmt, date: new Date().toLocaleDateString(), staffName: auth?.username || '—' }, cust, prod);
-                                                
-                                                loadPageData();
-                                            } else {
-                                                showToast("Payment failed", "error");
+                                                if (captureData.success || captureData.status === "COMPLETED") {
+                                                    showToast("Payment Successful!", "success");
+                                                    setForm({ customerId: '', productId: '', quantity: '', discount: '0', seasonal: false, paymentMethod: 'Cash' });
+                                                    
+                                                    addNotification(`Order #${pendingOrderId.current}: Paid online via PayPal`, 'order');
+                                                    alert("Payment Successful!");
+                                                    location.reload();
+                                                } else {
+                                                    console.error("Capture Failed Response:", captureData);
+                                                    showToast(captureData.error || "Payment capture failed on server", "error");
+                                                }
+                                            } catch (catchErr) {
+                                                console.error("Capture Logic Error:", catchErr);
+                                                showToast("Connection to Payment Backend failed", "error");
                                             }
                                         }}
-                                        onError={(err) => showToast("PayPal Error. Backend running?", "error")}
+                                        onError={(err) => {
+                                            console.error("PayPal Script/SDK Error:", err);
+                                            alert("PayPal Payment Failed. Please check console for details or ensure backend is running.");
+                                            showToast("PayPal Payment Failed", "error");
+                                        }}
                                     />
                                 </PayPalScriptProvider>
                             </div>
@@ -253,7 +274,7 @@ export default function Orders({ showToast, formatCurrency, refresh, auth }) {
 
             <div className="card">
                 <div className="card-title"><span className="icon">📋</span> Order History</div>
-                <div className="table-wrapper">
+                <div className="table-responsive">
                     <table>
                         <thead>
                             <tr><th>Order #</th><th>Date</th><th>Customer</th><th>Product</th><th>Placed By</th><th>Qty</th><th>Discount</th><th>Total</th><th>Profit</th><th>Status</th><th>Actions</th></tr>

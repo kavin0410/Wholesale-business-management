@@ -1,7 +1,10 @@
-// Use relative path '/' in production, and localhost:8000 for local dev
 const BASE_URL = import.meta.env.MODE === 'production' 
     ? '/api' 
     : 'http://localhost:8000/api'
+
+export const PAYPAL_BASE_URL = import.meta.env.MODE === 'production'
+    ? '/api/paypal'
+    : 'http://localhost:5000/api/paypal'
 
 /**
  * Common fetch utility with error handling and headers for SupplyNest.

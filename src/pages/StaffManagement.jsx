@@ -127,7 +127,7 @@ export default function StaffManagement({ showToast }) {
                         📄 Export Staff Performance PDF
                     </button>
                 </div>
-                <div className="table-wrapper">
+                <div className="table-responsive">
                     <table>
                         <thead>
                             <tr>

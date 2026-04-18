@@ -126,7 +126,7 @@ export default function Suppliers({ showToast, refresh, auth }) {
             {/* Table */}
             <div className="card">
                 <div className="card-title"><span className="icon">📋</span> Supplier List ({suppliers.length})</div>
-                <div className="table-wrapper">
+                <div className="table-responsive">
                     <table>
                         <thead>
                             <tr>

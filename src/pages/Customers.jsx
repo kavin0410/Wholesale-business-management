@@ -113,7 +113,7 @@ export default function Customers({ showToast, refresh, auth }) {
 
             <div className="card">
                 <div className="card-title"><span className="icon">👥</span> Customer List</div>
-                <div className="table-wrapper">
+                <div className="table-responsive">
                     <table>
                         <thead><tr>
                             <th>#</th><th>Name</th><th>Phone</th><th>Email</th><th>Address</th>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { fetchPayments, createPaymentApi, fetchPaymentSummaryApi, fetchOrders, fetchCustomers, addNotification, hasPermission, updateOrderStatusApi } from '../store'
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js'
+import { PAYPAL_BASE_URL } from '../utils/api'
 
 export default function Payments({ showToast, formatCurrency, refresh, auth }) {
     const [payments, setPayments] = useState([])
@@ -131,7 +132,7 @@ export default function Payments({ showToast, formatCurrency, refresh, auth }) {
                                     <PayPalButtons
                                         disabled={!form.orderId || !form.amount || Number(form.amount) <= 0}
                                         createOrder={async () => {
-                                            const res = await fetch("http://localhost:4000/api/paypal/create-order", {
+                                            const res = await fetch(`${PAYPAL_BASE_URL}/create-order`, {
                                                 method: "POST",
                                                 headers: { "Content-Type": "application/json" },
                                                 body: JSON.stringify({ amount: form.amount })
@@ -141,35 +142,38 @@ export default function Payments({ showToast, formatCurrency, refresh, auth }) {
                                               showToast(data.error, "error");
                                               throw new Error(data.error);
                                             }
-                                            return data.orderID;
+                                            return data.id;
                                         }}
                                         onApprove={async (data, actions) => {
-                                            const res = await fetch("http://localhost:4000/api/paypal/capture-order", {
-                                                method: "POST",
-                                                headers: { "Content-Type": "application/json" },
-                                                body: JSON.stringify({ orderID: data.orderID })
-                                            });
-                                            const captureData = await res.json();
-                                            if (captureData.status === "COMPLETED") {
-                                                // Record payment in your local database
-                                                await createPaymentApi({
-                                                    orderId: Number(form.orderId),
-                                                    amount: form.amount,
-                                                    method: "PayPal"
-                                                });
-                                                // Update order status to PAID
-                                                await updateOrderStatusApi(Number(form.orderId), "Paid");
-                                                
-                                                showToast("Payment Successful", "success");
-                                                setForm({ orderId: '', amount: '', method: '' });
-                                                loadData();
-                                            } else {
-                                                showToast("Payment failed", "error");
-                                            }
-                                        }}
-                                        onError={(err) => {
-                                            showToast("PayPal Error. Is the backend running?", "error");
-                                        }}
+                                             try {
+                                                 const res = await fetch(`${PAYPAL_BASE_URL}/capture-order`, {
+                                                     method: "POST",
+                                                     headers: { "Content-Type": "application/json" },
+                                                     body: JSON.stringify({ 
+                                                         orderId: data.orderID,
+                                                         dbOrderId: Number(form.orderId)
+                                                     })
+                                                 });
+                                                 const captureData = await res.json();
+                                                 if (captureData.success || captureData.status === "COMPLETED") {
+                                                     showToast("Payment Successful", "success");
+                                                     setForm({ orderId: '', amount: '', method: '' });
+                                                     loadData();
+                                                     alert("Payment Successful!");
+                                                 } else {
+                                                     console.error("Payment capture failed:", captureData);
+                                                     showToast(captureData.error || "Payment failed", "error");
+                                                 }
+                                             } catch (err) {
+                                                 console.error("Capture Error:", err);
+                                                 showToast("Connection to Payment Backend failed", "error");
+                                             }
+                                         }}
+                                         onError={(err) => {
+                                             console.error("PayPal Script/SDK Error:", err);
+                                             alert("PayPal Payment Failed. Check console.");
+                                             showToast("PayPal Error. Is the backend running?", "error");
+                                         }}
                                     />
                                 </PayPalScriptProvider>
                             </div>
@@ -182,7 +186,7 @@ export default function Payments({ showToast, formatCurrency, refresh, auth }) {
 
             <div className="card">
                 <div className="card-title"><span className="icon">📋</span> Payment History</div>
-                <div className="table-wrapper">
+                <div className="table-responsive">
                     <table>
                         <thead><tr><th>#</th><th>Date</th><th>Order #</th><th>Customer</th><th>Amount</th><th>Method</th></tr></thead>
                         <tbody>

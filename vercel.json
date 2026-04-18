@@ -1,13 +1,28 @@
 {
-  "functions": {
-    "api/*.py": {
-      "includeFiles": "backend/**"
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "api/paypal.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
     }
-  },
+  ],
   "rewrites": [
     {
+      "source": "/api/paypal/:path*",
+      "destination": "/api/paypal"
+    },
+    {
       "source": "/api/:path*",
-      "destination": "/api"
+      "destination": "/api/index"
     },
     {
       "source": "/(.*)",

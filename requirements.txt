@@ -3,5 +3,5 @@ uvicorn[standard]
 pydantic
 aiofiles
 python-multipart
-# vercel python runtime doesn't need gunicorn
+python-dotenv
 

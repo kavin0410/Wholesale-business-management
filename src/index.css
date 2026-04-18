@@ -1394,90 +1394,6 @@ tbody tr:hover {
 /* ══════════════════════════════════════════════════════
    RESPONSIVE — Tablet
    ══════════════════════════════════════════════════════ */
-@media (max-width: 900px) {
-    .main-layout {
-        padding: 80px 20px 36px 20px;
-    }
-
-    .stats-grid {
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    }
-
-    .di-nav-item .nav-label {
-        display: none;
-    }
-
-    .di-brand-text {
-        display: none;
-    }
-
-    .dynamic-island {
-        padding: 4px 8px;
-    }
-
-    .charts-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* ══════════════════════════════════════════════════════
-   RESPONSIVE — Phone
-   ══════════════════════════════════════════════════════ */
-@media (max-width: 600px) {
-    .main-layout {
-        padding: 76px 14px 28px 14px;
-    }
-
-    .stats-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 14px;
-    }
-
-    .stat-card {
-        padding: 18px;
-    }
-
-    .stat-card .stat-icon {
-        width: 44px;
-        height: 44px;
-        font-size: 22px;
-    }
-
-    .stat-info h3 {
-        font-size: 20px;
-    }
-
-    .card {
-        padding: 20px 18px;
-    }
-
-    .form-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .page-header h1 {
-        font-size: 24px;
-    }
-
-    .quick-info-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .dynamic-island {
-        top: 8px;
-        gap: 0;
-        padding: 4px 6px;
-    }
-
-    .di-nav-item {
-        padding: 6px 8px;
-    }
-
-    .di-actions {
-        padding-left: 4px;
-    }
-}
-
 /* ══════════════════════════════════════════════════════
    DELIVERY TRACKING
    ══════════════════════════════════════════════════════ */
@@ -1535,15 +1451,8 @@ tbody tr:hover {
 }
 
 @keyframes pulse-dot {
-
-    0%,
-    100% {
-        transform: scale(1.15);
-    }
-
-    50% {
-        transform: scale(1.25);
-    }
+    0%, 100% { transform: scale(1.15); }
+    50% { transform: scale(1.25); }
 }
 
 .timeline-label {
@@ -1669,8 +1578,79 @@ tbody tr:hover {
     margin-top: 4px;
 }
 
-/* Responsive */
+/* ══════════════════════════════════════════════════════
+   RESPONSIVE DESIGN — Final Consolidated Queries
+   ══════════════════════════════════════════════════════ */
+
+/* --- Tablet / Large Mobile (up to 1024px) --- */
+@media (max-width: 1024px) {
+    .main-layout {
+        padding: 100px 32px 60px 32px;
+    }
+
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .di-nav-item .nav-label {
+        font-size: 11px;
+    }
+}
+
+/* --- Mobile (up to 768px) --- */
 @media (max-width: 768px) {
+    .main-layout {
+        padding: 90px 20px 40px 20px;
+    }
+
+    .page-header h1 {
+        font-size: 26px;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 16px;
+    }
+
+    .quick-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dynamic-island {
+        top: 10px;
+        width: 96%;
+        padding: 4px;
+        border-radius: 30px;
+    }
+
+    .di-brand-text {
+        display: none;
+    }
+
+    .di-nav {
+        gap: 0;
+        overflow-x: auto;
+        scrollbar-width: none; /* Hide scrollbar Firefox */
+        -ms-overflow-style: none; /* Hide scrollbar IE/Edge */
+    }
+
+    .di-nav::-webkit-scrollbar {
+        display: none; /* Hide scrollbar Chrome/Safari */
+    }
+
+    .di-nav-item {
+        padding: 8px 12px;
+    }
+
+    .di-action-btn, .di-avatar {
+        width: 34px;
+        height: 34px;
+    }
+
+    .di-currency-select {
+        display: none;
+    }
+
     .delivery-detail-grid {
         grid-template-columns: 1fr;
     }
@@ -1685,49 +1665,96 @@ tbody tr:hover {
     .timeline-step {
         flex-direction: row;
         gap: 12px;
+        width: 100%;
+        justify-content: flex-start;
+        flex: none;
     }
 
     .timeline-connector {
         display: none;
     }
 
-    /* Logo responsive sizing */
-    .di-brand-logo {
-        width: 32px;
-        height: 32px;
+    .login-card {
+        padding: 40px 24px;
+        width: 90%;
     }
 
-    .di-brand-text {
-        font-size: 12px;
-    }
-
-    .login-logo-container {
-        width: 90px;
-        height: 90px;
-    }
-
-    .login-brand h1 {
-        font-size: 20px;
+    .form-grid {
+        grid-template-columns: 1fr;
     }
 }
 
+/* --- Small Mobile (up to 480px) --- */
 @media (max-width: 480px) {
-    .di-brand-text {
+    .main-layout {
+        padding: 85px 16px 30px 16px;
+    }
+
+    .page-header h1 {
+        font-size: 22px;
+    }
+
+    .di-nav-item .nav-label {
         display: none;
     }
 
-    .di-brand-logo {
-        width: 30px;
-        height: 30px;
+    .di-nav-item {
+        padding: 10px;
     }
 
-    .login-logo-container {
-        width: 76px;
-        height: 76px;
+    .di-nav-item .nav-emoji {
+        font-size: 20px;
     }
 
-    .login-card {
-        padding: 36px 24px;
+    .stats-grid {
+        grid-template-columns: 1fr; /* Single column on very small screens */
+    }
+
+    .di-notif-dropdown {
+        position: fixed;
+        width: 94vw;
+        left: 3vw;
+        right: 3vw;
+        top: 70px;
+    }
+
+    .di-profile-dropdown {
+        position: fixed;
+        width: 200px;
+        right: 16px;
+        top: 70px;
+    }
+
+    .stat-card {
+        padding: 20px;
+    }
+
+    .stat-info h3 {
+        font-size: 22px;
+    }
+
+    .table-responsive {
+        margin: 0 -16px;
+        padding: 0 16px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table, table {
+        min-width: 600px;
+    }
+    
+    .perf-item {
+        padding: 10px;
+        gap: 10px;
+    }
+    
+    .perf-name {
+        font-size: 13px;
+    }
+    
+    .perf-value {
+        font-size: 14px;
     }
 }
 

@@ -88,7 +88,7 @@ export default function DeliveryTracking({ formatCurrency, showToast, auth }) {
             {!selectedOrderId && (
                 <div className="card">
                     <div className="card-title"><span className="icon">📦</span> All Deliveries</div>
-                    <div className="table-wrapper">
+                    <div className="table-responsive">
                         <table>
                             <thead>
                                 <tr><th>Order #</th><th>Customer</th><th>Product</th><th>Amount</th><th>Status</th><th>Expected</th><th>Actions</th></tr>

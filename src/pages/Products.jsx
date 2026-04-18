@@ -191,7 +191,7 @@ export default function Products({ showToast, formatCurrency, refresh: refreshAp
                     </div>
                 )}
                 <div className="card-title"><span className="icon">📋</span> Product List</div>
-                <div className="table-wrapper">
+                <div className="table-responsive">
                     <table>
                         <thead>
                             <tr>
